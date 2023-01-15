@@ -8,14 +8,14 @@ import warnings
 
 import hoomd
 from hoomd.md import _md
-from hoomd.md import force
+from hoomd.md.force import Force
 from hoomd.data.parameterdicts import ParameterDict, TypeParameterDict
 from hoomd.data.typeparam import TypeParameter
 import numpy as np
 from hoomd.data.typeconverter import OnlyFrom, nonnegative_real
 
 
-class Pair(force.Force):
+class Pair(Force):
     r"""Base class pair force.
 
     `Pair` is the base class for all pair forces.
@@ -123,6 +123,13 @@ class Pair(force.Force):
         # above and raise an error if they occur.
         return self._cpp_obj.computeEnergyBetweenSets(tags1, tags2)
 
+    def compute_virial_pressure_contribution(self, head_list, n_neigh, n_list, axis):
+        # Specifically for spatial pressure calculations, binned along the given axis!
+        # Given nlist data that is binned...
+        # Given this neighbor list, computes the virial pressure contribution of the
+        # pair potential.
+        return self._cpp_obj.computeVirialPressureFromNeighbors(head_list, n_neigh,n_list,axis)
+    
     def _attach_hook(self):
         if self.nlist._attached and self._simulation != self.nlist._simulation:
             warnings.warn(

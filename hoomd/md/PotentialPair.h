@@ -204,6 +204,20 @@ template<class evaluator> class PotentialPair : public ForceCompute
     computeEnergyBetweenSetsPythonList(pybind11::array_t<int, pybind11::array::c_style> tags1,
                                        pybind11::array_t<int, pybind11::array::c_style> tags2);
 
+    template<class InputIterator>
+    void computeVirialPressureContributionBetweenSets(InputIterator first1,
+                                                      InputIterator last1,
+                                                      InputIterator first2,
+                                                      InputIterator last2,
+                                                      std::array<Scalar, 6>& virial_pressure,
+                                                      unsigned int axis);
+
+    std::array<Scalar, 6> 
+    computeVirialPressureFromNeighborsPythonList(pybind11::array_t<int, pybind11::array::c_style> head_list,
+                                                 pybind11::array_t<int, pybind11::array::c_style> n_neigh,
+                                                 pybind11::array_t<int, pybind11::array::c_style> nlist,
+                                                 int axis);
+
     std::vector<std::string> getTypeShapeMapping() const
         {
         std::vector<std::string> type_shape_mapping(m_pdata->getNTypes());
@@ -1058,6 +1072,248 @@ Scalar PotentialPair<evaluator>::computeEnergyBetweenSetsPythonList(
     return eng;
     }
 
+//! function to compute the energy between two lists of particles.
+//! strictly speaking tags1 and tags2 should be disjoint for the result to make any sense.
+//! \param virial_pressure is the sum of the scaled virials.
+//! \param axis is the axis along which binning was performed
+template<class evaluator>
+template<class InputIterator>
+inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSets(InputIterator first1,
+                                                               InputIterator last1,
+                                                               InputIterator first2,
+                                                               InputIterator last2,
+                                                               std::array<Scalar, 6>& virial_pressure,
+                                                               unsigned int axis)
+    {
+    if (first1 == last1 || first2 == last2)
+        return;
+
+#ifdef ENABLE_MPI
+    if (m_sysdef->isDomainDecomposed())
+        {
+        // temporarily add tag comm flag
+        CommFlags old_flags = m_comm->getFlags();
+        CommFlags new_flags = old_flags;
+        new_flags[comm_flag::tag] = 1;
+        m_comm->setFlags(new_flags);
+
+        // force communication
+        m_comm->migrateParticles();
+        m_comm->exchangeGhosts();
+
+        // reset the old flags
+        m_comm->setFlags(old_flags);
+        }
+#endif
+
+    virial_pressure = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
+    ArrayHandle<unsigned int> h_rtags(m_pdata->getRTags(),
+                                      access_location::host,
+                                      access_mode::read);
+    ArrayHandle<Scalar> h_diameter(m_pdata->getDiameters(),
+                                   access_location::host,
+                                   access_mode::read);
+    ArrayHandle<Scalar> h_charge(m_pdata->getCharges(), access_location::host, access_mode::read);
+
+    const BoxDim box = m_pdata->getGlobalBox();
+    ArrayHandle<Scalar> h_ronsq(m_ronsq, access_location::host, access_mode::read);
+    ArrayHandle<Scalar> h_rcutsq(m_rcutsq, access_location::host, access_mode::read);
+
+    // for each particle in tags1
+    while (first1 != last1)
+        {
+        unsigned int i = h_rtags.data[*first1];
+        first1++;
+        if (i >= m_pdata->getN()) // not owned by this processor.
+            continue;
+        // access the particle's position and type (MEM TRANSFER: 4 scalars)
+        Scalar3 pi = make_scalar3(h_pos.data[i].x, h_pos.data[i].y, h_pos.data[i].z);
+        unsigned int typei = __scalar_as_int(h_pos.data[i].w);
+
+        // sanity check
+        assert(typei < m_pdata->getNTypes());
+
+        // access diameter and charge (if needed)
+        Scalar di = Scalar(0.0);
+        Scalar qi = Scalar(0.0);
+        if (evaluator::needsDiameter())
+            di = h_diameter.data[i];
+        if (evaluator::needsCharge())
+            qi = h_charge.data[i];
+
+        // loop over all particles in tags2
+        for (InputIterator iter = first2; iter != last2; ++iter)
+            {
+            // access the index of this neighbor (MEM TRANSFER: 1 scalar)
+            unsigned int j = h_rtags.data[*iter];
+            if (j >= m_pdata->getN() + m_pdata->getNGhosts()) // not on this processor at all
+                continue;
+            // calculate dr_ji (MEM TRANSFER: 3 scalars / FLOPS: 3)
+            Scalar3 pj = make_scalar3(h_pos.data[j].x, h_pos.data[j].y, h_pos.data[j].z);
+            Scalar3 dx = pi - pj;
+
+            // access the type of the neighbor particle (MEM TRANSFER: 1 scalar)
+            unsigned int typej = __scalar_as_int(h_pos.data[j].w);
+            assert(typej < m_pdata->getNTypes());
+
+            // access diameter and charge (if needed)
+            Scalar dj = Scalar(0.0);
+            Scalar qj = Scalar(0.0);
+            if (evaluator::needsDiameter())
+                dj = h_diameter.data[j];
+            if (evaluator::needsCharge())
+                qj = h_charge.data[j];
+
+            // apply periodic boundary conditions
+            dx = box.minImage(dx);
+
+            // calculate r_ij squared (FLOPS: 5)
+            Scalar rsq = dot(dx, dx);
+
+            // get parameters for this type pair
+            unsigned int typpair_idx = m_typpair_idx(typei, typej);
+            const param_type& param = m_params[typpair_idx];
+            Scalar rcutsq = h_rcutsq.data[typpair_idx];
+            Scalar ronsq = Scalar(0.0);
+            if (m_shift_mode == xplor)
+                ronsq = h_ronsq.data[typpair_idx];
+
+            // design specifies that energies are shifted if
+            // 1) shift mode is set to shift
+            // or 2) shift mode is explor and ron > rcut
+            bool energy_shift = false;
+            if (m_shift_mode == shift)
+                energy_shift = true;
+            else if (m_shift_mode == xplor)
+                {
+                if (ronsq > rcutsq)
+                    energy_shift = true;
+                }
+
+            // compute the force and potential energy
+            Scalar force_divr = Scalar(0.0);
+            Scalar pair_eng = Scalar(0.0);
+            evaluator eval(rsq, rcutsq, param);
+            if (evaluator::needsDiameter())
+                eval.setDiameter(di, dj);
+            if (evaluator::needsCharge())
+                eval.setCharge(qi, qj);
+
+            bool evaluated = eval.evalForceAndEnergy(force_divr, pair_eng, energy_shift);
+
+            if (evaluated)
+                {
+                // modify the potential for xplor shifting
+                if (m_shift_mode == xplor)
+                    {
+                    if (rsq >= ronsq && rsq < rcutsq)
+                        {
+                        // Implement XPLOR smoothing (FLOPS: 16)
+                        Scalar old_pair_eng = pair_eng;
+                        Scalar old_force_divr = force_divr;
+
+                        // calculate 1.0 / (xplor denominator)
+                        Scalar xplor_denom_inv
+                            = Scalar(1.0)
+                              / ((rcutsq - ronsq) * (rcutsq - ronsq) * (rcutsq - ronsq));
+
+                        Scalar rsq_minus_r_cut_sq = rsq - rcutsq;
+                        Scalar s = rsq_minus_r_cut_sq * rsq_minus_r_cut_sq
+                                   * (rcutsq + Scalar(2.0) * rsq - Scalar(3.0) * ronsq)
+                                   * xplor_denom_inv;
+                        Scalar ds_dr_divr
+                            = Scalar(12.0) * (rsq - ronsq) * rsq_minus_r_cut_sq * xplor_denom_inv;
+
+                        // make modifications to the old pair energy and force
+                        pair_eng = old_pair_eng * s;
+                        // note: I'm not sure why the minus sign needs to be there: my notes have a
+                        // + But this is verified correct via plotting
+                        force_divr = s * old_force_divr - ds_dr_divr * old_pair_eng;
+                        }
+                    }
+                
+                // Compute the virial for this pair of particles
+                // Assign the entire virial to this pair as the two sets should be disjoint
+                // In other words, the pair should not be repeated! 
+                Scalar virialxxij = force_divr * dx.x * dx.x;
+                Scalar virialxyij = force_divr * dx.x * dx.y;
+                Scalar virialxzij = force_divr * dx.x * dx.z;
+                Scalar virialyyij = force_divr * dx.y * dx.y;
+                Scalar virialyzij = force_divr * dx.y * dx.z;
+                Scalar virialzzij = force_divr * dx.z * dx.z;
+                
+                double divfact;
+                switch (axis)
+                    {
+                    case 0:
+                        divfact = 1/dx.x;
+                    case 1:
+                        divfact = 1/dx.y;
+                    case 2:
+                        divfact = 1/dx.z;
+                    }
+                divfact = fabs(divfact);
+                virial_pressure[0] += divfact*virialxxij;
+                virial_pressure[1] += divfact*virialxyij;
+                virial_pressure[2] += divfact*virialxzij;
+                virial_pressure[3] += divfact*virialyyij;
+                virial_pressure[4] += divfact*virialyzij;
+                virial_pressure[5] += divfact*virialzzij;
+                }
+            }
+        }
+#ifdef ENABLE_MPI
+    if (this->m_pdata->getDomainDecomposition())
+        {
+        MPI_Allreduce(MPI_IN_PLACE,
+                      &virial_pressure,
+                      1,
+                      MPI_HOOMD_SCALAR,
+                      MPI_SUM,
+                      m_exec_conf->getMPICommunicator());
+        }
+#endif
+    }
+
+//! Calculates the virial contribution to the pressure from a hoomd-style neighbor list according
+//! to the IK formalism.
+template<class evaluator>
+std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighborsPythonList(
+    pybind11::array_t<int, pybind11::array::c_style> head_list,
+    pybind11::array_t<int, pybind11::array::c_style> n_neigh,
+    pybind11::array_t<int, pybind11::array::c_style> nlist,
+    int axis)
+    {
+    std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    if (head_list.ndim() != 1)
+        throw std::domain_error("error: ndim != 2");
+    unsigned int* ihead = (unsigned int*)head_list.mutable_data();
+
+    if (n_neigh.ndim() != 1)
+        throw std::domain_error("error: ndim != 2");
+    unsigned int* inneigh = (unsigned int*)n_neigh.mutable_data();
+
+    if (nlist.ndim() != 1)
+        throw std::domain_error("error: ndim != 2");
+    unsigned int* inlist = (unsigned int*)nlist.mutable_data();
+
+    unsigned int h, nn;
+    std::array<Scalar, 6> virPtemp = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    for (unsigned int i = 0; i < head_list.size(); ++i)
+        {
+        h = *(ihead+i);
+        nn = *(inneigh+i);
+        computeVirialPressureContributionBetweenSets(&i, &i, inlist+h, inlist+h+nn, virPtemp, axis);
+        for (unsigned int k = 0; k < 6; ++k) 
+            { virP[k] += virPtemp[k]; }
+        }
+
+    return virP;
+    }
+
 namespace detail
     {
 //! Export this pair potential to python
@@ -1083,6 +1339,7 @@ template<class T> void export_PotentialPair(pybind11::module& m, const std::stri
                       &PotentialPair<T>::getTailCorrectionEnabled,
                       &PotentialPair<T>::setTailCorrectionEnabled)
         .def("computeEnergyBetweenSets", &PotentialPair<T>::computeEnergyBetweenSetsPythonList)
+        .def("computeVirialPressureFromNeighbors", &PotentialPair<T>::computeVirialPressureFromNeighborsPythonList)
         .def("slotWriteGSDShapeSpec", &PotentialPair<T>::slotWriteGSDShapeSpec)
         .def("connectGSDShapeSpec", &PotentialPair<T>::connectGSDShapeSpec);
     }
