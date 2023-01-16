@@ -128,6 +128,9 @@ class Pair(Force):
         # Given nlist data that is binned...
         # Given this neighbor list, computes the virial pressure contribution of the
         # pair potential.
+        # Virials are scaled by 1/z_{ij}, and to sum up contributions outputted by 
+        # this method into the pressure they need to be scaled by 1/A where A is the
+        # cross-sectional area orthogonal to the binned axis
         return self._cpp_obj.computeVirialPressureFromNeighbors(head_list, n_neigh,n_list,axis)
     
     def _attach_hook(self):
