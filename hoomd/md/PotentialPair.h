@@ -1104,7 +1104,6 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
         m_comm->setFlags(old_flags);
         }
 #endif
-
     virial_pressure = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
@@ -1119,13 +1118,12 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
     const BoxDim box = m_pdata->getGlobalBox();
     ArrayHandle<Scalar> h_ronsq(m_ronsq, access_location::host, access_mode::read);
     ArrayHandle<Scalar> h_rcutsq(m_rcutsq, access_location::host, access_mode::read);
-
     // for each particle in tags1
     while (first1 != last1)
         {
         unsigned int i = h_rtags.data[*first1];
         first1++;
-        first2++;
+
         if (i >= m_pdata->getN()) // not owned by this processor.
             continue;
         // access the particle's position and type (MEM TRANSFER: 4 scalars)
@@ -1147,6 +1145,7 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
         // OLD FOR LOOP HERE
         // access the index of this neighbor (MEM TRANSFER: 1 scalar)
         unsigned int j = h_rtags.data[*first2];
+        first2++;
         if (j >= m_pdata->getN() + m_pdata->getNGhosts()) // not on this processor at all
             continue;
         // calculate dr_ji (MEM TRANSFER: 3 scalars / FLOPS: 3)
@@ -1284,15 +1283,12 @@ std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighbo
     int axis)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
-
     if (neighbors0.ndim() != 1)
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_n0 = (unsigned int*)neighbors0.mutable_data();
-
     if (neighbors1.ndim() != 1)
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_n1 = (unsigned int*)neighbors1.mutable_data();
-
     computeVirialPressureContributionBetweenSets(i_n0, i_n0 + neighbors0.size(), i_n1, i_n1 + neighbors1.size(), virP, axis);
 
     return virP;

@@ -136,7 +136,8 @@ class Pair(Force):
         for (i,j) in neighbors[:]:
             neighbor0.append(i)
             neighbor1.append(j)
-        return self._cpp_obj.computeVirialPressureFromNeighbors(neighbor0,neighbor1,axis)
+        result = self._cpp_obj.computeVirialPressureFromNeighbors(neighbor0,neighbor1,axis)
+        return np.array(result)
     
     def _attach_hook(self):
         if self.nlist._attached and self._simulation != self.nlist._simulation:
