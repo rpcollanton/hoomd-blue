@@ -1283,12 +1283,15 @@ std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighbo
     int axis)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
     if (neighbors0.ndim() != 1)
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_n0 = (unsigned int*)neighbors0.mutable_data();
+
     if (neighbors1.ndim() != 1)
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_n1 = (unsigned int*)neighbors1.mutable_data();
+    
     computeVirialPressureContributionBetweenSets(i_n0, i_n0 + neighbors0.size(), i_n1, i_n1 + neighbors1.size(), virP, axis);
 
     return virP;

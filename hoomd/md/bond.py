@@ -39,7 +39,7 @@ from hoomd.data.typeparam import TypeParameter
 from hoomd.data.parameterdicts import TypeParameterDict
 import hoomd
 
-import numpy
+import numpy as np
 
 
 class Bond(Force):
@@ -54,6 +54,15 @@ class Bond(Force):
 
     def __init__(self):
         super().__init__()
+    
+    def compute_virial_pressure_contribution(self, bonds, axis):
+        # Specifically for spatial pressure calculations, binned along the given axis!
+
+        # Virials are scaled by 1/z_{ij}, and to sum up contributions outputted by 
+        # this method into the pressure they need to be scaled by 1/A where A is the
+        # cross-sectional area orthogonal to the binned axis
+        result = self._cpp_obj.computeVirialPressureFromBonds(bonds, axis)
+        return np.array(result)
 
     def _attach_hook(self):
         """Create the c++ mirror class."""
@@ -254,8 +263,8 @@ class Table(Bond):
             TypeParameterDict(
                 r_min=float,
                 r_max=float,
-                U=hoomd.data.typeconverter.NDArrayValidator(numpy.float64),
-                F=hoomd.data.typeconverter.NDArrayValidator(numpy.float64),
+                U=hoomd.data.typeconverter.NDArrayValidator(np.float64),
+                F=hoomd.data.typeconverter.NDArrayValidator(np.float64),
                 len_keys=1))
         self._add_typeparam(params)
 

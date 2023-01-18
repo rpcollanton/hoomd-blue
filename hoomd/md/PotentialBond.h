@@ -60,6 +60,15 @@ template<class evaluator, class Bonds> class PotentialBond : public ForceCompute
     virtual CommFlags getRequestedCommFlags(uint64_t timestep);
 #endif
 
+    template <class InputIterator>
+    void computeVirialPressureFromBonds(InputIterator bondsFirst,
+                                        InputIterator bondsLast,
+                                        std::array<Scalar, 6>& virial_pressure,
+                                        unsigned int axis);
+    
+    std::array<Scalar, 6> computeVirialPressureFromBondsPythonList(pybind11::array_t<int, pybind11::array::c_style> bonds,
+                                                                   int axis);
+
     protected:
     GPUArray<param_type> m_params;      //!< Bond parameters per type
     std::shared_ptr<Bonds> m_bond_data; //!< Bond data to use in computing bonds
@@ -351,6 +360,165 @@ CommFlags PotentialBond<evaluator, Bonds>::getRequestedCommFlags(uint64_t timest
     }
 #endif
 
+template<class evaluator, class Bonds>
+template <class InputIterator>
+inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(InputIterator bondsFirst,
+                                                                            InputIterator bondsLast,
+                                                                            std::array<Scalar, 6>& virial_pressure,
+                                                                            unsigned int axis)
+    {
+    virial_pressure = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    assert(m_pdata);
+
+    // access the particle data arrays
+    ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(), access_location::host, access_mode::read);
+    ArrayHandle<unsigned int> h_rtag(m_pdata->getRTags(), access_location::host, access_mode::read);
+    ArrayHandle<Scalar> h_diameter(m_pdata->getDiameters(),
+                                   access_location::host,
+                                   access_mode::read);
+    ArrayHandle<Scalar> h_charge(m_pdata->getCharges(), access_location::host, access_mode::read);
+
+    // access the parameters
+    ArrayHandle<param_type> h_params(m_params, access_location::host, access_mode::read);
+
+    // we are using the minimum image of the global box here
+    // to ensure that ghosts are always correctly wrapped (even if a bond exceeds half the domain
+    // length)
+    const BoxDim box = m_pdata->getGlobalBox();
+
+    Scalar bond_virial[6];
+    for (unsigned int i = 0; i < 6; i++)
+        bond_virial[i] = Scalar(0.0);
+
+    ArrayHandle<typename Bonds::members_t> h_bonds(m_bond_data->getMembersArray(),
+                                                   access_location::host,
+                                                   access_mode::read);
+    ArrayHandle<typeval_t> h_typeval(m_bond_data->getTypeValArray(),
+                                     access_location::host,
+                                     access_mode::read);
+
+    unsigned int max_local = m_pdata->getN() + m_pdata->getNGhosts();
+
+    // for each of the bonds
+
+    while (bondsFirst != bondsLast)
+        {
+        // lookup the tag of each of the particles participating in the bond
+        const typename Bonds::members_t& bond = h_bonds.data[*bondsFirst];
+
+        assert(bond.tag[0] < m_pdata->getMaximumTag() + 1);
+        assert(bond.tag[1] < m_pdata->getMaximumTag() + 1);
+
+        // transform a and b into indices into the particle data arrays
+        // (MEM TRANSFER: 4 integers)
+        unsigned int idx_a = h_rtag.data[bond.tag[0]];
+        unsigned int idx_b = h_rtag.data[bond.tag[1]];
+
+        // throw an error if this bond is incomplete
+        if (idx_a >= max_local || idx_b >= max_local)
+            {
+            std::ostringstream stream;
+            stream << "Error: bond " << bond.tag[0] << " " << bond.tag[1] << " is incomplete.";
+            throw std::runtime_error(stream.str());
+            }
+
+        // calculate d\vec{r}
+        // (MEM TRANSFER: 6 Scalars / FLOPS: 3)
+        Scalar3 posa = make_scalar3(h_pos.data[idx_a].x, h_pos.data[idx_a].y, h_pos.data[idx_a].z);
+        Scalar3 posb = make_scalar3(h_pos.data[idx_b].x, h_pos.data[idx_b].y, h_pos.data[idx_b].z);
+
+        Scalar3 dx = posb - posa;
+
+        // access diameter (if needed)
+        Scalar diameter_a = Scalar(0.0);
+        Scalar diameter_b = Scalar(0.0);
+        if (evaluator::needsDiameter())
+            {
+            diameter_a = h_diameter.data[idx_a];
+            diameter_b = h_diameter.data[idx_b];
+            }
+
+        // access charge (if needed)
+        Scalar charge_a = Scalar(0.0);
+        Scalar charge_b = Scalar(0.0);
+        if (evaluator::needsCharge())
+            {
+            charge_a = h_charge.data[idx_a];
+            charge_b = h_charge.data[idx_b];
+            }
+
+        // if the vector crosses the box, pull it back
+        dx = box.minImage(dx);
+
+        // calculate r_ab squared
+        Scalar rsq = dot(dx, dx);
+
+        // compute the force and potential energy
+        Scalar force_divr = Scalar(0.0);
+        Scalar bond_eng = Scalar(0.0);
+        evaluator eval(rsq, h_params.data[h_typeval.data[*bondsFirst].type]);
+        if (evaluator::needsDiameter())
+            eval.setDiameter(diameter_a, diameter_b);
+        if (evaluator::needsCharge())
+            eval.setCharge(charge_a, charge_b);
+
+        bool evaluated = eval.evalForceAndEnergy(force_divr, bond_eng);
+
+        // Bond energy must be halved
+        bond_eng *= Scalar(0.5);
+
+        if (evaluated)
+            {
+            // calculate virial
+            bond_virial[0] = dx.x * dx.x * force_divr; // xx
+            bond_virial[1] = dx.x * dx.y * force_divr; // xy
+            bond_virial[2] = dx.x * dx.z * force_divr; // xz
+            bond_virial[3] = dx.y * dx.y * force_divr; // yy
+            bond_virial[4] = dx.y * dx.z * force_divr; // yz
+            bond_virial[5] = dx.z * dx.z * force_divr; // zz
+
+            double divfact;
+            switch (axis)
+                {
+                case 0:
+                    divfact = 1/dx.x;
+                case 1:
+                    divfact = 1/dx.y;
+                case 2:
+                    divfact = 1/dx.z;
+                }
+            divfact = fabs(divfact);
+            for (int i = 0; i < 6; i++)
+                virial_pressure[i] += divfact*bond_virial[i];
+            }
+        else
+            {
+            this->m_exec_conf->msg->error()
+                << "bond." << evaluator::getName() << ": bond out of bounds" << std::endl
+                << std::endl;
+            throw std::runtime_error("Error in bond calculation");
+            }
+        
+        bondsFirst++;
+        }
+    }
+
+template<class evaluator, class Bonds>
+std::array<Scalar, 6> PotentialBond<evaluator, Bonds>::computeVirialPressureFromBondsPythonList(
+    pybind11::array_t<int, pybind11::array::c_style> bonds,
+    int axis)
+    {
+    std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+    if (bonds.ndim() != 1)
+        throw std::domain_error("error: ndim != 2");
+    unsigned int* i_bonds = (unsigned int*)bonds.mutable_data();
+
+    computeVirialPressureFromBonds(i_bonds, i_bonds + bonds.size(), virP, axis);
+
+    return virP;
+    }
+
 namespace detail
     {
 //! Exports the PotentialBond class to python
@@ -364,7 +532,8 @@ template<class T> void export_PotentialBond(pybind11::module& m, const std::stri
                      std::shared_ptr<PotentialBond<T, BondData>>>(m, name.c_str())
         .def(pybind11::init<std::shared_ptr<SystemDefinition>>())
         .def("setParams", &PotentialBond<T, BondData>::setParamsPython)
-        .def("getParams", &PotentialBond<T, BondData>::getParams);
+        .def("getParams", &PotentialBond<T, BondData>::getParams)
+        .def("computeVirialPressureFromBonds", &PotentialBond<T, BondData>::computeVirialPressureFromBondsPythonList);
     }
 
 //! Exports the PotentialMeshBond class to python
