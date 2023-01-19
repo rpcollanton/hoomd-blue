@@ -64,10 +64,10 @@ template<class evaluator, class Bonds> class PotentialBond : public ForceCompute
     void computeVirialPressureFromBonds(InputIterator bondsFirst,
                                         InputIterator bondsLast,
                                         std::array<Scalar, 6>& virial_pressure,
-                                        unsigned int axis);
+                                        unsigned int axis, double edge0, double edge1);
     
     std::array<Scalar, 6> computeVirialPressureFromBondsPythonList(pybind11::array_t<int, pybind11::array::c_style> bonds,
-                                                                   int axis);
+                                                                   int axis, double edge0, double edge1);
 
     protected:
     GPUArray<param_type> m_params;      //!< Bond parameters per type
@@ -365,7 +365,7 @@ template <class InputIterator>
 inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(InputIterator bondsFirst,
                                                                             InputIterator bondsLast,
                                                                             std::array<Scalar, 6>& virial_pressure,
-                                                                            unsigned int axis)
+                                                                            unsigned int axis, double edge0, double edge1)
     {
     virial_pressure = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     assert(m_pdata);
@@ -477,17 +477,65 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
             bond_virial[4] = dx.y * dx.z * force_divr; // yz
             bond_virial[5] = dx.z * dx.z * force_divr; // zz
 
-            double divfact;
+            double divfact, d_axis, d_overlap, l, u;
             switch (axis)
                 {
                 case 0:
-                    divfact = 1/dx.x;
+                    d_axis = 1/dx.x;
+                    // which particle has a larger coordinate?
+                    if (posa.x > posb.x) 
+                        {
+                        u = posa.x;
+                        l = posb.x;
+                        }
+                    else
+                        {
+                        u = posb.x;
+                        l = posa.x;
+                        }
                 case 1:
-                    divfact = 1/dx.y;
+                    d_axis = 1/dx.y;
+                    // which particle has a larger coordinate?
+                    if (posa.x > posb.x) 
+                        {
+                        u = posa.y;
+                        l = posb.y;
+                        }
+                    else
+                        {
+                        u = posb.y;
+                        l = posa.y;
+                        }
                 case 2:
-                    divfact = 1/dx.z;
+                    d_axis = 1/dx.z;
+                    // which particle has a larger coordinate?
+                    if (posa.x > posb.x) 
+                        {
+                        u = posa.z;
+                        l = posb.z;
+                        }
+                    else
+                        {
+                        u = posb.z;
+                        l = posa.z;
+                        }
                 }
-            divfact = fabs(divfact);
+            // what portion of this overlaps with the box?
+            if (u > edge1)
+                {
+                if (l > edge0)
+                    d_overlap = edge1-l;
+                else
+                    d_overlap = edge1-edge0;
+                }
+            else
+                {
+                if (l > edge0)
+                    d_overlap = u-l;
+                else
+                    d_overlap = u-edge0;
+                }
+            divfact = fabs(d_overlap/d_axis);
             for (int i = 0; i < 6; i++)
                 virial_pressure[i] += divfact*bond_virial[i];
             }
@@ -506,7 +554,7 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
 template<class evaluator, class Bonds>
 std::array<Scalar, 6> PotentialBond<evaluator, Bonds>::computeVirialPressureFromBondsPythonList(
     pybind11::array_t<int, pybind11::array::c_style> bonds,
-    int axis)
+    int axis, double edge0, double edge1)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -514,7 +562,7 @@ std::array<Scalar, 6> PotentialBond<evaluator, Bonds>::computeVirialPressureFrom
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_bonds = (unsigned int*)bonds.mutable_data();
 
-    computeVirialPressureFromBonds(i_bonds, i_bonds + bonds.size(), virP, axis);
+    computeVirialPressureFromBonds(i_bonds, i_bonds + bonds.size(), virP, axis, edge0, edge1);
 
     return virP;
     }

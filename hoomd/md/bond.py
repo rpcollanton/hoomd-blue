@@ -55,13 +55,13 @@ class Bond(Force):
     def __init__(self):
         super().__init__()
     
-    def compute_virial_pressure_contribution(self, bonds, axis):
+    def compute_virial_pressure_contribution(self, bonds, axis, edge0, edge1):
         # Specifically for spatial pressure calculations, binned along the given axis!
 
         # Virials are scaled by 1/z_{ij}, and to sum up contributions outputted by 
         # this method into the pressure they need to be scaled by 1/A where A is the
         # cross-sectional area orthogonal to the binned axis
-        result = self._cpp_obj.computeVirialPressureFromBonds(bonds, axis)
+        result = self._cpp_obj.computeVirialPressureFromBonds(bonds, axis, edge0, edge1)
         return np.array(result)
 
     def _attach_hook(self):

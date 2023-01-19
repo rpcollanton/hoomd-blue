@@ -210,12 +210,13 @@ template<class evaluator> class PotentialPair : public ForceCompute
                                                       InputIterator first2,
                                                       InputIterator last2,
                                                       std::array<Scalar, 6>& virial_pressure,
+                                                      double edge0, double edge1,
                                                       unsigned int axis);
 
     std::array<Scalar, 6> 
     computeVirialPressureFromNeighborsPythonList(pybind11::array_t<int, pybind11::array::c_style> neighbors0,
                                                  pybind11::array_t<int, pybind11::array::c_style> neighbors1,
-                                                 int axis);
+                                                 int axis, double edge0, double edge1);
 
     std::vector<std::string> getTypeShapeMapping() const
         {
@@ -1082,6 +1083,8 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
                                                                InputIterator first2,
                                                                InputIterator last2,
                                                                std::array<Scalar, 6>& virial_pressure,
+                                                               double edge0,
+                                                               double edge1,
                                                                unsigned int axis)
     {
     if (first1 == last1 || first2 == last2)
@@ -1142,7 +1145,6 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
             qi = h_charge.data[i];
 
         // neighbor of particle i
-        // OLD FOR LOOP HERE
         // access the index of this neighbor (MEM TRANSFER: 1 scalar)
         unsigned int j = h_rtags.data[*first2];
         first2++;
@@ -1242,17 +1244,65 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
             Scalar virialyzij = force_divr * dx.y * dx.z;
             Scalar virialzzij = force_divr * dx.z * dx.z;
             
-            double divfact;
+            double divfact, d_axis, d_overlap, l, u;
             switch (axis)
                 {
                 case 0:
-                    divfact = 1/dx.x;
+                    d_axis = 1/dx.x;
+                    // which particle has a larger coordinate?
+                    if (pi.x > pj.x) 
+                        {
+                        u = pi.x;
+                        l = pj.x;
+                        }
+                    else
+                        {
+                        u = pj.x;
+                        l = pi.x;
+                        }
                 case 1:
-                    divfact = 1/dx.y;
+                    d_axis = 1/dx.y;
+                    // which particle has a larger coordinate?
+                    if (pi.x > pj.x) 
+                        {
+                        u = pi.y;
+                        l = pj.y;
+                        }
+                    else
+                        {
+                        u = pj.y;
+                        l = pi.y;
+                        }
                 case 2:
-                    divfact = 1/dx.z;
+                    d_axis = 1/dx.z;
+                    // which particle has a larger coordinate?
+                    if (pi.x > pj.x) 
+                        {
+                        u = pi.z;
+                        l = pj.z;
+                        }
+                    else
+                        {
+                        u = pj.z;
+                        l = pi.z;
+                        }
                 }
-            divfact = fabs(divfact);
+            // what portion of this overlaps with the box?
+            if (u > edge1)
+                {
+                if (l > edge0)
+                    d_overlap = edge1-l;
+                else
+                    d_overlap = edge1-edge0;
+                }
+            else
+                {
+                if (l > edge0)
+                    d_overlap = u-l;
+                else
+                    d_overlap = u-edge0;
+                }
+            divfact = fabs(d_overlap/d_axis);
             virial_pressure[0] += divfact*virialxxij;
             virial_pressure[1] += divfact*virialxyij;
             virial_pressure[2] += divfact*virialxzij;
@@ -1280,7 +1330,7 @@ template<class evaluator>
 std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighborsPythonList(
     pybind11::array_t<int, pybind11::array::c_style> neighbors0,
     pybind11::array_t<int, pybind11::array::c_style> neighbors1,
-    int axis)
+    int axis, double edge0, double edge1)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -1292,7 +1342,7 @@ std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighbo
         throw std::domain_error("error: ndim != 2");
     unsigned int* i_n1 = (unsigned int*)neighbors1.mutable_data();
     
-    computeVirialPressureContributionBetweenSets(i_n0, i_n0 + neighbors0.size(), i_n1, i_n1 + neighbors1.size(), virP, axis);
+    computeVirialPressureContributionBetweenSets(i_n0, i_n0 + neighbors0.size(), i_n1, i_n1 + neighbors1.size(), virP, edge0, edge1, axis);
 
     return virP;
     }

@@ -123,7 +123,7 @@ class Pair(Force):
         # above and raise an error if they occur.
         return self._cpp_obj.computeEnergyBetweenSets(tags1, tags2)
 
-    def compute_virial_pressure_contribution(self, neighbors, axis):
+    def compute_virial_pressure_contribution(self, neighbors, axis, edge0, edge1):
         # Specifically for spatial pressure calculations, binned along the given axis!
         # Given nlist data that is binned...
         # Given this neighbor list, computes the virial pressure contribution of the
@@ -136,7 +136,7 @@ class Pair(Force):
         for (i,j) in neighbors[:]:
             neighbor0.append(i)
             neighbor1.append(j)
-        result = self._cpp_obj.computeVirialPressureFromNeighbors(neighbor0,neighbor1,axis)
+        result = self._cpp_obj.computeVirialPressureFromNeighbors(neighbor0,neighbor1,axis,edge0,edge1)
         return np.array(result)
     
     def _attach_hook(self):
