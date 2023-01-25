@@ -210,13 +210,13 @@ template<class evaluator> class PotentialPair : public ForceCompute
                                                       InputIterator first2,
                                                       InputIterator last2,
                                                       std::array<Scalar, 6>& virial_pressure,
-                                                      double edge0, double edge1,
+                                                      Scalar edge0, Scalar edge1,
                                                       unsigned int axis);
 
     std::array<Scalar, 6> 
     computeVirialPressureFromNeighborsPythonList(pybind11::array_t<int, pybind11::array::c_style> neighbors0,
                                                  pybind11::array_t<int, pybind11::array::c_style> neighbors1,
-                                                 int axis, double edge0, double edge1);
+                                                 int axis, Scalar edge0, Scalar edge1);
 
     std::vector<std::string> getTypeShapeMapping() const
         {
@@ -1083,8 +1083,8 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
                                                                InputIterator first2,
                                                                InputIterator last2,
                                                                std::array<Scalar, 6>& virial_pressure,
-                                                               double edge0,
-                                                               double edge1,
+                                                               Scalar edge0,
+                                                               Scalar edge1,
                                                                unsigned int axis)
     {
     if (first1 == last1 || first2 == last2)
@@ -1243,66 +1243,21 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
             Scalar virialyyij = force_divr * dx.y * dx.y;
             Scalar virialyzij = force_divr * dx.y * dx.z;
             Scalar virialzzij = force_divr * dx.z * dx.z;
-            
-            double divfact, d_axis, d_overlap, l, u;
-            switch (axis)
-                {
-                case 0:
-                    d_axis = 1/dx.x;
-                    // which particle has a larger coordinate?
-                    if (pi.x > pj.x) 
-                        {
-                        u = pi.x;
-                        l = pj.x;
-                        }
-                    else
-                        {
-                        u = pj.x;
-                        l = pi.x;
-                        }
-                case 1:
-                    d_axis = 1/dx.y;
-                    // which particle has a larger coordinate?
-                    if (pi.x > pj.x) 
-                        {
-                        u = pi.y;
-                        l = pj.y;
-                        }
-                    else
-                        {
-                        u = pj.y;
-                        l = pi.y;
-                        }
-                case 2:
-                    d_axis = 1/dx.z;
-                    // which particle has a larger coordinate?
-                    if (pi.x > pj.x) 
-                        {
-                        u = pi.z;
-                        l = pj.z;
-                        }
-                    else
-                        {
-                        u = pj.z;
-                        l = pi.z;
-                        }
-                }
-            // what portion of this overlaps with the box?
-            if (u > edge1)
-                {
-                if (l > edge0)
-                    d_overlap = edge1-l;
-                else
-                    d_overlap = edge1-edge0;
-                }
-            else
-                {
-                if (l > edge0)
-                    d_overlap = u-l;
-                else
-                    d_overlap = u-edge0;
-                }
-            divfact = fabs(d_overlap/d_axis);
+
+            // Determine the fraction of the interaction virial assigned to this bin
+            double divfact, d_overlap;
+
+            // what portion of this overlaps with the bin?
+            Scalar3 z_edge0 = make_scalar3(0.0, 0.0, 0.0);
+            Scalar3 z_edge1 = make_scalar3(0.0, 0.0, 0.0);
+            z_edge0 = setScalarByIndex(z_edge0, axis, edge0);
+            z_edge1 = setScalarByIndex(z_edge1, axis, edge1);
+
+            // Calculate 1D overlap of the lines connecting pi with pj and the bin edges.
+            // Note, this function considers periodic boundary conditions, I think properly!
+            d_overlap = box.get1DOverlap(pi, pj, z_edge0, z_edge1, axis);
+            divfact = fabs(d_overlap/getScalarByIndex(dx, axis));
+
             virial_pressure[0] += divfact*virialxxij;
             virial_pressure[1] += divfact*virialxyij;
             virial_pressure[2] += divfact*virialxzij;
@@ -1330,7 +1285,7 @@ template<class evaluator>
 std::array<Scalar, 6> PotentialPair<evaluator>::computeVirialPressureFromNeighborsPythonList(
     pybind11::array_t<int, pybind11::array::c_style> neighbors0,
     pybind11::array_t<int, pybind11::array::c_style> neighbors1,
-    int axis, double edge0, double edge1)
+    int axis, Scalar edge0, Scalar edge1)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 

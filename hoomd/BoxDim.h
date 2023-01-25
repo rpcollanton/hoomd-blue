@@ -551,6 +551,79 @@ struct
         return dist;
         }
 
+    //! Get 1D overlap of two lines in 3D space along a specified axis
+    //! Essentially a good way of finding the fraction of a line that is within a bin
+    //! Overlap is defined along the minimum image of the contour lines connecting a0 and a1, and b0 and b1
+    HOSTDEVICE Scalar get1DOverlap(const Scalar3& p0, const Scalar3& p1, const Scalar3& z0, const Scalar3& z1, const unsigned int axis) const
+        {
+        // Shift p0, p1, z0, z1 into their minimum image locations
+        Scalar3 p1_min = minImage(p1), p0_min = minImage(p0);
+        Scalar3 z1_min = minImage(z1), z0_min = minImage(z0);
+        
+        // Compute dp between minimum images of p0 and p1 and find its image (each axis either -1, 0, +1)
+        Scalar3 dp = p1_min-p0_min;
+        int3 dp_img = getImage(dp);
+
+        // Find upper and lower z values
+        Scalar3 zl, zu;
+        if (getScalarByIndex(z1_min,axis) > getScalarByIndex(z0_min,axis))
+            {
+            zu = z1_min;
+            zl = z0_min;
+            }
+        else
+            {
+            zu = z0_min;
+            zl = z1_min;
+            }
+
+        // Shift p0 and p1 by +dp_img and -dp_img respectively
+        Scalar3 p1_shifted = shift(p1_min, -dp_img);
+        Scalar3 p0_shifted = shift(p0_min, dp_img);
+
+        // Compute overlap of each case (shifted 0, 1) with zu, zl, depending on axis
+        Scalar d_overlap = 0;
+        Scalar l, u;
+        // First, shifted 1. Find which point is greater.
+        Scalar3 pl, pu;
+        if (getScalarByIndex(p1_shifted,axis) > getScalarByIndex(p0_min,axis))
+            {
+            pu = p1_shifted;
+            pl = p0_min;
+            }
+        else
+            {
+            pu = p0_min;
+            pl = p1_shifted;
+            }
+        l = hoomd::slow::max(getScalarByIndex(pl,axis), getScalarByIndex(zl,axis));
+        u = hoomd::slow::min(getScalarByIndex(pu,axis), getScalarByIndex(zu,axis));
+        d_overlap += u-l;
+
+        // Now, the case of shifted 0. Only do this case if dp_img != 0, otherwise would double count!
+        if (getIntByIndex(dp_img, axis) != 0)
+            {
+            if (getScalarByIndex(p0_shifted,axis) > getScalarByIndex(p1_min,axis))
+                {
+                pu = p0_shifted;
+                pl = p1_min;
+                }
+            else
+                {
+                pu = p1_min;
+                pl = p0_shifted;
+                }
+            l = hoomd::slow::max(getScalarByIndex(pl,axis), getScalarByIndex(zl,axis));
+            u = hoomd::slow::min(getScalarByIndex(pu,axis), getScalarByIndex(zu,axis));
+            d_overlap += u-l;
+            }
+        
+        // return the distance that overlaps. If fractional distance is desired, this can be 
+        // calculated in whatever function is calling this one
+        return d_overlap;
+        }  
+
+
     //! Get the volume of the box
     /*! \returns the volume
      *  \param twod If true, return the area instead of the volume

@@ -607,11 +607,57 @@ inline HOSTDEVICE float rint(float x)
     {
     return ::rintf(x);
     }
+
+/// RYAN'S max scalar function
+inline HOSTDEVICE hoomd::Scalar max(const Scalar& a, const Scalar& b)
+    {
+    return (a > b) ? a : b;
+    }
+
+/// RYAN'S min scalar function
+inline HOSTDEVICE hoomd::Scalar min(const Scalar& a, const Scalar& b)
+    {
+    return (a < b) ? a : b;
+    }
+
     } // namespace slow
 
     } // end namespace hoomd
 
 // ------------ Vector math functions --------------------------
+//! Accessor to get the value from a Scalar3 using 0, 1, 2 instead of x, y, z
+HOSTDEVICE inline hoomd::Scalar getScalarByIndex(const hoomd::Scalar3& a, const unsigned int& i)
+    {
+    hoomd::Scalar val;
+    switch(i)
+        {
+        case 0:
+            val = a.x;
+        case 1:
+            val = a.y;
+        case 2:
+            val = a.z; 
+        }
+    return val;
+    }
+
+//! Setter to set out-of-place the value of a Scalar3 using 0, 1, 2 instead of x, y, z
+HOSTDEVICE inline hoomd::Scalar3 setScalarByIndex(const hoomd::Scalar3& a, const unsigned int& i, 
+                                                    const hoomd::Scalar& val)
+    {
+    hoomd::Scalar3 b = a;
+    switch(i)
+        {
+        case 0:
+            b.x = val;
+        case 1:
+            b.y = val;
+        case 2:
+            b.z = val; 
+        }
+    return b;
+    }
+
 //! Comparison operator needed for export of std::vector<uint2>
 HOSTDEVICE inline bool operator==(const uint2& a, const uint2& b)
     {
@@ -741,6 +787,22 @@ HOSTDEVICE inline hoomd::Scalar dot(const hoomd::Scalar3& a, const hoomd::Scalar
     }
 
 // ----------- Integer vector math functions ----------------------
+//! Accessor to get the value from an int3 using 0, 1, 2 instead of x, y, z
+HOSTDEVICE inline int getIntByIndex(const int3& a, const unsigned int& i)
+    {
+    int val;
+    switch(i)
+        {
+        case 0:
+            val = a.x;
+        case 1:
+            val = a.y;
+        case 2:
+            val = a.z; 
+        }
+    return val;
+    }
+
 //! Integer vector addition
 HOSTDEVICE inline int3 operator+(const int3& a, const int3& b)
     {
@@ -772,6 +834,7 @@ HOSTDEVICE inline int3 operator-(const int3& a)
     {
     return make_int3(-a.x, -a.y, -a.z);
     }
+
 //! Integer vector comparison
 HOSTDEVICE inline bool operator==(const int3& a, const int3& b)
     {

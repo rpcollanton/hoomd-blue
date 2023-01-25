@@ -64,10 +64,10 @@ template<class evaluator, class Bonds> class PotentialBond : public ForceCompute
     void computeVirialPressureFromBonds(InputIterator bondsFirst,
                                         InputIterator bondsLast,
                                         std::array<Scalar, 6>& virial_pressure,
-                                        unsigned int axis, double edge0, double edge1);
+                                        unsigned int axis, Scalar edge0, Scalar edge1);
     
     std::array<Scalar, 6> computeVirialPressureFromBondsPythonList(pybind11::array_t<int, pybind11::array::c_style> bonds,
-                                                                   int axis, double edge0, double edge1);
+                                                                   int axis, Scalar edge0, Scalar edge1);
 
     protected:
     GPUArray<param_type> m_params;      //!< Bond parameters per type
@@ -365,7 +365,7 @@ template <class InputIterator>
 inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(InputIterator bondsFirst,
                                                                             InputIterator bondsLast,
                                                                             std::array<Scalar, 6>& virial_pressure,
-                                                                            unsigned int axis, double edge0, double edge1)
+                                                                            unsigned int axis, Scalar edge0, Scalar edge1)
     {
     virial_pressure = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     assert(m_pdata);
@@ -477,65 +477,20 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
             bond_virial[4] = dx.y * dx.z * force_divr; // yz
             bond_virial[5] = dx.z * dx.z * force_divr; // zz
 
-            double divfact, d_axis, d_overlap, l, u;
-            switch (axis)
-                {
-                case 0:
-                    d_axis = 1/dx.x;
-                    // which particle has a larger coordinate?
-                    if (posa.x > posb.x) 
-                        {
-                        u = posa.x;
-                        l = posb.x;
-                        }
-                    else
-                        {
-                        u = posb.x;
-                        l = posa.x;
-                        }
-                case 1:
-                    d_axis = 1/dx.y;
-                    // which particle has a larger coordinate?
-                    if (posa.x > posb.x) 
-                        {
-                        u = posa.y;
-                        l = posb.y;
-                        }
-                    else
-                        {
-                        u = posb.y;
-                        l = posa.y;
-                        }
-                case 2:
-                    d_axis = 1/dx.z;
-                    // which particle has a larger coordinate?
-                    if (posa.x > posb.x) 
-                        {
-                        u = posa.z;
-                        l = posb.z;
-                        }
-                    else
-                        {
-                        u = posb.z;
-                        l = posa.z;
-                        }
-                }
-            // what portion of this overlaps with the box?
-            if (u > edge1)
-                {
-                if (l > edge0)
-                    d_overlap = edge1-l;
-                else
-                    d_overlap = edge1-edge0;
-                }
-            else
-                {
-                if (l > edge0)
-                    d_overlap = u-l;
-                else
-                    d_overlap = u-edge0;
-                }
-            divfact = fabs(d_overlap/d_axis);
+            // Determine the fraction of the interaction virial assigned to this bin
+            double divfact, d_overlap;
+
+            // what portion of this overlaps with the bin?
+            Scalar3 z_edge0 = make_scalar3(0.0, 0.0, 0.0);
+            Scalar3 z_edge1 = make_scalar3(0.0, 0.0, 0.0);
+            z_edge0 = setScalarByIndex(z_edge0, axis, edge0);
+            z_edge1 = setScalarByIndex(z_edge1, axis, edge1);
+
+            // Calculate 1D overlap of the lines connecting pi with pj and the bin edges.
+            // Note, this function considers periodic boundary conditions, I think properly!
+            d_overlap = box.get1DOverlap(posa, posb, z_edge0, z_edge1, axis);
+            divfact = fabs(d_overlap/getScalarByIndex(dx, axis));
+
             for (int i = 0; i < 6; i++)
                 virial_pressure[i] += divfact*bond_virial[i];
             }
@@ -554,7 +509,7 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
 template<class evaluator, class Bonds>
 std::array<Scalar, 6> PotentialBond<evaluator, Bonds>::computeVirialPressureFromBondsPythonList(
     pybind11::array_t<int, pybind11::array::c_style> bonds,
-    int axis, double edge0, double edge1)
+    int axis, Scalar edge0, Scalar edge1)
     {
     std::array<Scalar, 6> virP = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
