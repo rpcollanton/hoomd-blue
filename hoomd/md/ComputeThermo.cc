@@ -27,7 +27,7 @@ ComputeThermo::ComputeThermo(std::shared_ptr<SystemDefinition> sysdef,
                              std::shared_ptr<ParticleGroup> group)
     : Compute(sysdef), m_group(group)
     {
-    m_exec_conf->msg->notice(5) << "Constructing ComputeThermo" << endl;
+    m_exec_conf->msg->notice(5) <<   "Constructing ComputeThermo" << endl;
 
     assert(m_pdata);
     GlobalArray<Scalar> properties(thermo_index::num_quantities, m_exec_conf);
@@ -219,6 +219,8 @@ void ComputeThermo::computeProperties()
     double virial_yz = m_pdata->getExternalVirial(4);
     double virial_zz = m_pdata->getExternalVirial(5);
 
+    std::cout << "External virials: " << virial_xx << " " << virial_xy << " " << virial_xz << " " << virial_yy << " " << virial_yz << " " << virial_zz << std::endl;
+
     if (flags[pdata_flag::pressure_tensor])
         {
         // Calculate upper triangular virial tensor
@@ -264,6 +266,9 @@ void ComputeThermo::computeProperties()
     // pressure: P = (N * K_B * T + W)/V
     Scalar pressure = (2.0 * ke_trans_total / Scalar(D) + W) / volume;
 
+    std::cout << "Virials: " << virial_xx << " " << virial_xy << " " << virial_xz << " " << virial_yy << " " << virial_yz << " " << virial_zz << std::endl;
+    std::cout << "Kinetic Pressures: " << pressure_kinetic_xx << " " << pressure_kinetic_xy << " " << pressure_kinetic_xz << " " << pressure_kinetic_yy << " " << pressure_kinetic_yz << " " << pressure_kinetic_zz << std::endl;
+    std::cout << "Volume: " << volume std::endl;
     // pressure tensor = (kinetic part + virial) / V
     Scalar pressure_xx = (pressure_kinetic_xx + virial_xx) / volume;
     Scalar pressure_xy = (pressure_kinetic_xy + virial_xy) / volume;
