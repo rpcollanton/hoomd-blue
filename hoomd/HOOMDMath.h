@@ -624,36 +624,44 @@ inline HOSTDEVICE hoomd::Scalar min(const Scalar& a, const Scalar& b)
 
     } // end namespace hoomd
 
+#include <iostream>
 // ------------ Vector math functions --------------------------
 //! Accessor to get the value from a Scalar3 using 0, 1, 2 instead of x, y, z
-HOSTDEVICE inline hoomd::Scalar getScalarByIndex(const hoomd::Scalar3& a, const unsigned int& i)
+HOSTDEVICE inline hoomd::Scalar getScalarByIndex(const hoomd::Scalar3 a, const unsigned int& i)
     {
-    hoomd::Scalar val;
+    hoomd::Scalar retval;
     switch(i)
         {
         case 0:
-            val = a.x;
+            retval = a.x;
+            break;
         case 1:
-            val = a.y;
+            retval = a.y;
+            break;
         case 2:
-            val = a.z; 
+            retval = a.z; 
+            break;
         }
-    return val;
+    return retval;
     }
 
 //! Setter to set out-of-place the value of a Scalar3 using 0, 1, 2 instead of x, y, z
-HOSTDEVICE inline hoomd::Scalar3 setScalarByIndex(const hoomd::Scalar3& a, const unsigned int& i, 
-                                                    const hoomd::Scalar& val)
+HOSTDEVICE inline hoomd::Scalar3 setScalarByIndex(const hoomd::Scalar3 a, const unsigned int& i, 
+                                                    const hoomd::Scalar val)
     {
     hoomd::Scalar3 b = a;
+    std::cout << "Math Function got argument i = " << i << std::endl;
     switch(i)
         {
         case 0:
             b.x = val;
+            break;
         case 1:
             b.y = val;
+            break;
         case 2:
             b.z = val; 
+            break;
         }
     return b;
     }
@@ -795,10 +803,13 @@ HOSTDEVICE inline int getIntByIndex(const int3& a, const unsigned int& i)
         {
         case 0:
             val = a.x;
+            break;
         case 1:
             val = a.y;
+            break;
         case 2:
             val = a.z; 
+            break;
         }
     return val;
     }

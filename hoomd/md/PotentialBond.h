@@ -385,6 +385,7 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
     // to ensure that ghosts are always correctly wrapped (even if a bond exceeds half the domain
     // length)
     const BoxDim box = m_pdata->getGlobalBox();
+    Scalar divBinWidth = fabs(1/(edge1-edge0));
 
     Scalar bond_virial[6];
     for (unsigned int i = 0; i < 6; i++)
@@ -478,7 +479,7 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
             bond_virial[5] = dx.z * dx.z * force_divr; // zz
 
             // Determine the fraction of the interaction virial assigned to this bin
-            double divfact, d_overlap;
+            Scalar fracInBin, d_overlap;
 
             // what portion of this overlaps with the bin?
             Scalar3 z_edge0 = make_scalar3(0.0, 0.0, 0.0);
@@ -489,10 +490,13 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
             // Calculate 1D overlap of the lines connecting pi with pj and the bin edges.
             // Note, this function considers periodic boundary conditions, I think properly!
             d_overlap = box.get1DOverlap(posa, posb, z_edge0, z_edge1, axis);
-            divfact = fabs(d_overlap/getScalarByIndex(dx, axis));
+            fracInBin = fabs(d_overlap/getScalarByIndex(dx, axis));
+            // fracInBin = 1;
+
+            std::cout << "Bond " << fracInBin << std::endl;
 
             for (int i = 0; i < 6; i++)
-                virial_pressure[i] += divfact*bond_virial[i];
+                virial_pressure[i] += fracInBin*divBinWidth*bond_virial[i];
             }
         else
             {

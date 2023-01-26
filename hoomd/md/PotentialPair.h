@@ -1119,6 +1119,8 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
     ArrayHandle<Scalar> h_charge(m_pdata->getCharges(), access_location::host, access_mode::read);
 
     const BoxDim box = m_pdata->getGlobalBox();
+    Scalar divBinWidth = fabs(1/(edge1-edge0));
+
     ArrayHandle<Scalar> h_ronsq(m_ronsq, access_location::host, access_mode::read);
     ArrayHandle<Scalar> h_rcutsq(m_rcutsq, access_location::host, access_mode::read);
     // for each particle in tags1
@@ -1245,25 +1247,35 @@ inline void PotentialPair<evaluator>::computeVirialPressureContributionBetweenSe
             Scalar virialzzij = force_divr * dx.z * dx.z;
 
             // Determine the fraction of the interaction virial assigned to this bin
-            double divfact, d_overlap;
+            Scalar fracInBin, d_overlap;
 
             // what portion of this overlaps with the bin?
             Scalar3 z_edge0 = make_scalar3(0.0, 0.0, 0.0);
             Scalar3 z_edge1 = make_scalar3(0.0, 0.0, 0.0);
             z_edge0 = setScalarByIndex(z_edge0, axis, edge0);
             z_edge1 = setScalarByIndex(z_edge1, axis, edge1);
+            std::cout << "CHECK SET SCALAR" << std::endl;
+            std::cout << z_edge0.x << " " << z_edge0.y << " " << z_edge0.z << std::endl;
+
+            std::cout << "CHECK GET SCALR" << std::endl;
+            std::cout << getScalarByIndex(z_edge0, 0) << std::endl;
 
             // Calculate 1D overlap of the lines connecting pi with pj and the bin edges.
             // Note, this function considers periodic boundary conditions, I think properly!
+            std::cout << "EDGES: " << edge0 << " " << edge1 << std::endl;
             d_overlap = box.get1DOverlap(pi, pj, z_edge0, z_edge1, axis);
-            divfact = fabs(d_overlap/getScalarByIndex(dx, axis));
-
-            virial_pressure[0] += divfact*virialxxij;
-            virial_pressure[1] += divfact*virialxyij;
-            virial_pressure[2] += divfact*virialxzij;
-            virial_pressure[3] += divfact*virialyyij;
-            virial_pressure[4] += divfact*virialyzij;
-            virial_pressure[5] += divfact*virialzzij;
+            std::cout << "What is the dx in the relevant direction of the binned axis?" << std::endl;
+            std::cout << "      dx: " << getScalarByIndex(dx, axis) << std::endl << std::endl;
+            fracInBin = fabs(d_overlap/getScalarByIndex(dx, axis));
+            //fracInBin = 1; // temporary check to see if this fixes the problem
+            std::cout << "Pair " << fracInBin << std::endl;
+            
+            virial_pressure[0] += fracInBin*divBinWidth*virialxxij;
+            virial_pressure[1] += fracInBin*divBinWidth*virialxyij;
+            virial_pressure[2] += fracInBin*divBinWidth*virialxzij;
+            virial_pressure[3] += fracInBin*divBinWidth*virialyyij;
+            virial_pressure[4] += fracInBin*divBinWidth*virialyzij;
+            virial_pressure[5] += fracInBin*divBinWidth*virialzzij;
             }
         }
 #ifdef ENABLE_MPI
