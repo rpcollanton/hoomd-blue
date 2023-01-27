@@ -629,20 +629,17 @@ inline HOSTDEVICE hoomd::Scalar min(const Scalar& a, const Scalar& b)
 //! Accessor to get the value from a Scalar3 using 0, 1, 2 instead of x, y, z
 HOSTDEVICE inline hoomd::Scalar getScalarByIndex(const hoomd::Scalar3 a, const unsigned int& i)
     {
-    hoomd::Scalar retval;
     switch(i)
         {
         case 0:
-            retval = a.x;
-            break;
+            return a.x;
         case 1:
-            retval = a.y;
-            break;
+            return a.y;
         case 2:
-            retval = a.z; 
-            break;
+            return a.z;
+        default:
+            return -1000000
         }
-    return retval;
     }
 
 //! Setter to set out-of-place the value of a Scalar3 using 0, 1, 2 instead of x, y, z
