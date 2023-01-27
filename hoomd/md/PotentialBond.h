@@ -401,19 +401,19 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
     unsigned int max_local = m_pdata->getN() + m_pdata->getNGhosts();
 
     // for each of the bonds
-
     while (bondsFirst != bondsLast)
         {
         // lookup the tag of each of the particles participating in the bond
         const typename Bonds::members_t& bond = h_bonds.data[*bondsFirst];
-
         assert(bond.tag[0] < m_pdata->getMaximumTag() + 1);
         assert(bond.tag[1] < m_pdata->getMaximumTag() + 1);
 
         // transform a and b into indices into the particle data arrays
         // (MEM TRANSFER: 4 integers)
         unsigned int idx_a = h_rtag.data[bond.tag[0]];
+        // unsigned int idx_a = bond.tag[0];
         unsigned int idx_b = h_rtag.data[bond.tag[1]];
+        // unsigned int idx_b = bond.tag[1]; wth is going on 
 
         // throw an error if this bond is incomplete
         if (idx_a >= max_local || idx_b >= max_local)
@@ -491,12 +491,10 @@ inline void PotentialBond<evaluator, Bonds>::computeVirialPressureFromBonds(Inpu
             // Note, this function considers periodic boundary conditions, I think properly!
             d_overlap = box.get1DOverlap(posa, posb, z_edge0, z_edge1, axis);
             fracInBin = fabs(d_overlap/getScalarByIndex(dx, axis));
-            // fracInBin = 1;
-
-            std::cout << "Bond " << fracInBin << std::endl;
 
             for (int i = 0; i < 6; i++)
                 virial_pressure[i] += fracInBin*divBinWidth*bond_virial[i];
+
             }
         else
             {

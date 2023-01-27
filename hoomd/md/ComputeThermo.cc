@@ -219,8 +219,6 @@ void ComputeThermo::computeProperties()
     double virial_yz = m_pdata->getExternalVirial(4);
     double virial_zz = m_pdata->getExternalVirial(5);
 
-    std::cout << "External virials: " << virial_xx << " " << virial_xy << " " << virial_xz << " " << virial_yy << " " << virial_yz << " " << virial_zz << std::endl;
-
     if (flags[pdata_flag::pressure_tensor])
         {
         // Calculate upper triangular virial tensor
@@ -266,11 +264,6 @@ void ComputeThermo::computeProperties()
     // pressure: P = (N * K_B * T + W)/V
     Scalar pressure = (2.0 * ke_trans_total / Scalar(D) + W) / volume;
 
-    std::cout << "Virials: " << virial_xx/volume << " " << virial_xy/volume << " " << virial_xz/volume << " " 
-              << virial_yy/volume << " " << virial_yz/volume << " " << virial_zz/volume << std::endl;
-    std::cout << "Kinetic Pressures: " << pressure_kinetic_xx/volume << " " << pressure_kinetic_xy/volume << " " 
-              << pressure_kinetic_xz/volume << " " << pressure_kinetic_yy/volume << " " << pressure_kinetic_yz/volume << " " << pressure_kinetic_zz/volume << std::endl;
-    std::cout << "Volume: " << volume << std::endl;
     // pressure tensor = (kinetic part + virial) / V
     Scalar pressure_xx = (pressure_kinetic_xx + virial_xx) / volume;
     Scalar pressure_xy = (pressure_kinetic_xy + virial_xy) / volume;

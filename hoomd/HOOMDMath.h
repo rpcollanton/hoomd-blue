@@ -650,7 +650,6 @@ HOSTDEVICE inline hoomd::Scalar3 setScalarByIndex(const hoomd::Scalar3 a, const 
                                                     const hoomd::Scalar val)
     {
     hoomd::Scalar3 b = a;
-    std::cout << "Math Function got argument i = " << i << std::endl;
     switch(i)
         {
         case 0:

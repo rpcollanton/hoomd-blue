@@ -556,21 +556,10 @@ struct
     //! Overlap is defined along the minimum image of the contour lines connecting a0 and a1, and b0 and b1
     HOSTDEVICE Scalar get1DOverlap(const Scalar3& p0, const Scalar3& p1, const Scalar3& z0, const Scalar3& z1, const unsigned int axis) const
         {
-        std::cout << "---------- BEGINNING 1D OVERLAP DEBUG SESH ----------" << std::endl;
-        std::cout << "What are the inputs?" << std::endl; 
-        std::cout << "      p0: " << p0.x << " " << p0.y << " " << p0.z << std::endl;
-        std::cout << "      p1: " << p1.x << " " << p1.y << " " << p1.z << std::endl;
-        std::cout << "      z0: " << z0.x << " " << z0.y << " " << z0.z << std::endl;
-        std::cout << "      z1: " << z1.x << " " << z1.y << " " << z1.z << std::endl;
-        std::cout << "    axis: " << axis << std::endl << std::endl;
         
         // Compute dp between minimum images of p0 and p1 and find its image (each axis either -1, 0, +1)
         Scalar3 dp = p1-p0;
         int3 dp_img = getImage(dp);
-
-        std::cout << "What about distance between them and image of that distance?" << std::endl; 
-        std::cout << "          dp: " << dp.x << " " << dp.y << " " << dp.z << std::endl;
-        std::cout << "      dp_img: " << dp_img.x << " " << dp_img.y << " " << dp_img.z << std::endl << std::endl;
 
         // Find upper and lower z values
         Scalar3 zl, zu;
@@ -585,25 +574,16 @@ struct
             zl = z1;
             }
         
-        std::cout << "What about lower and upper edges?" << std::endl; 
-        std::cout << "      zl: " << zl.x << " " << zl.y << " " << zl.z << std::endl;
-        std::cout << "      zu: " << zu.x << " " << zu.y << " " << zu.z << std::endl << std::endl;
 
         // Shift p0 and p1 by +dp_img and -dp_img respectively
         Scalar3 p1_shifted = shift(p1, -dp_img);
         Scalar3 p0_shifted = shift(p0, dp_img);
-
-        std::cout << "What about shifted p1 and p0 by -/+dp_img?" << std::endl; 
-        std::cout << "      p1_shifted: " << p1_shifted.x << " " << p1_shifted.y << " " << p1_shifted.z << std::endl;
-        std::cout << "      p0_shifted: " << p0_shifted.x << " " << p0_shifted.y << " " << p0_shifted.z << std::endl << std::endl;
 
         // Compute overlap of each case (shifted 0, 1) with zu, zl, depending on axis
         Scalar d_overlap = 0;
         Scalar l, u;
         // First, shifted 1. Find which point is greater.
         Scalar3 pl, pu;
-        std::cout << "getScalarByIndex(p1_shifted,axis) " << getScalarByIndex(p1_shifted,axis) << std::endl; 
-        std::cout << "        getScalarByIndex(p0,axis) " << getScalarByIndex(p0,axis) << std::endl;
         if (getScalarByIndex(p1_shifted,axis) > getScalarByIndex(p0,axis))
             {
             pu = p1_shifted;
@@ -616,23 +596,9 @@ struct
             }
         l = hoomd::slow::max(getScalarByIndex(pl,axis), getScalarByIndex(zl,axis));
         u = hoomd::slow::min(getScalarByIndex(pu,axis), getScalarByIndex(zu,axis));
-        d_overlap += u-l;
-        
-        std::cout << "Overlap calculation 1..." << std::endl; 
-        std::cout << "Which is the upper point between p0 and p1_shifted?" << std::endl; 
-        std::cout << "      pl: " << pl.x << " " << pl.y << " " << pl.z << std::endl;
-        std::cout << "      pu: " << pu.x << " " << pu.y << " " << pu.z << std::endl << std::endl;
-
-        std::cout << "Which is the max(pl,zl) and min(pu,zu)?" << std::endl; 
-        std::cout << "      l: " << l << std::endl;
-        std::cout << "      u: " << u << std::endl;
-
-        std::cout << "What is final overlap calculated?" << std::endl; 
-        std::cout << "      d_overlap: " << d_overlap << std::endl;
-
+        if (u>l) d_overlap += u-l; // if u < l, no overlap!
 
         // Now, the case of shifted 0. Only do this case if dp_img != 0, otherwise would double count!
-        std::cout << "getIntByIndex(dp_img,axis) " << getIntByIndex(dp_img,axis) << std::endl; 
         if (getIntByIndex(dp_img, axis) != (int)0)
             {
             if (getScalarByIndex(p0_shifted,axis) > getScalarByIndex(p1,axis))
@@ -647,19 +613,9 @@ struct
                 }
             l = hoomd::slow::max(getScalarByIndex(pl,axis), getScalarByIndex(zl,axis));
             u = hoomd::slow::min(getScalarByIndex(pu,axis), getScalarByIndex(zu,axis));
-            d_overlap += u-l;
-
-            std::cout << "Overlap calculation 2..." << std::endl; 
-            std::cout << "Which is the upper point between p1 and p0_shifted?" << std::endl; 
-            std::cout << "      pl: " << pl.x << " " << pl.y << " " << pl.z << std::endl;
-            std::cout << "      pu: " << pu.x << " " << pu.y << " " << pu.z << std::endl << std::endl;
-
-            std::cout << "Which is the max(pl,zl) and min(pu,zu)?" << std::endl; 
-            std::cout << "      l: " << l << std::endl;
-            std::cout << "      u: " << u << std::endl;
-
-            std::cout << "What is final overlap calculated?" << std::endl; 
-            std::cout << "      d_overlap: " << d_overlap << std::endl;
+            
+            if (u>l) d_overlap += u-l; // if u < l, no overlap!
+            
             }
         
         // return the distance that overlaps. If fractional distance is desired, this can be 
