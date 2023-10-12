@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2023 The Regents of the University of Michigan.
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
-/*! \file BoxResizeUpdater.h
+/*! \file BoxScaleUpdater.h
     \brief Declares an updater that resizes the simulation box of the system
 */
 
@@ -9,10 +9,10 @@
 #error This header cannot be compiled by nvcc
 #endif
 
-#include "BoxResizeUpdater.h"
+#include "BoxScaleUpdater.h"
 
-#ifndef __BOX_RESIZE_UPDATER_GPU_H__
-#define __BOX_RESIZE_UPDATER_GPU_H__
+#ifndef __BOX_SCALE_UPDATER_GPU_H__
+#define __BOX_SCALE_UPDATER_GPU_H__
 
 namespace hoomd
     {
@@ -23,19 +23,23 @@ namespace hoomd
  * properly in MPI simulations with HPMC.
  * \ingroup updaters
  */
-class PYBIND11_EXPORT BoxResizeUpdaterGPU : public BoxResizeUpdater
+class PYBIND11_EXPORT BoxScaleUpdaterGPU : public BoxScaleUpdater
     {
     public:
     /// Constructor
-    BoxResizeUpdaterGPU(std::shared_ptr<SystemDefinition> sysdef,
-                        std::shared_ptr<Trigger> trigger,
-                        std::shared_ptr<BoxDim> box1,
-                        std::shared_ptr<BoxDim> box2,
-                        std::shared_ptr<Variant> variant,
-                        std::shared_ptr<ParticleGroup> m_group);
+    BoxScaleUpdaterGPU(std::shared_ptr<SystemDefinition> sysdef,
+                       std::shared_ptr<Trigger> trigger,
+                       std::shared_ptr<BoxDim> box,
+                       std::shared_ptr<Variant> variant_x,
+                       std::shared_ptr<Variant> variant_y,
+                       std::shared_ptr<Variant> variant_z,
+                       std::shared_ptr<Variant> variant_xy,
+                       std::shared_ptr<Variant> variant_xz,
+                       std::shared_ptr<Variant> variant_yz,
+                       std::shared_ptr<ParticleGroup> m_group);
 
     /// Destructor
-    virtual ~BoxResizeUpdaterGPU();
+    virtual ~BoxScaleUpdaterGPU();
 
     /// Scale particles to the new box and wrap any others back into the box
     virtual void scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box);
@@ -49,8 +53,8 @@ class PYBIND11_EXPORT BoxResizeUpdaterGPU : public BoxResizeUpdater
 
 namespace detail
     {
-/// Export the BoxResizeUpdaterGPU to python
-void export_BoxResizeUpdaterGPU(pybind11::module& m);
+/// Export the BoxScaleUpdaterGPU to python
+void export_BoxScaleUpdaterGPU(pybind11::module& m);
     }  // end namespace detail
     }  // end namespace hoomd
-#endif // __BOX_RESIZE_UPDATER_GPU_H__
+#endif // __BOX_SCALE_UPDATER_GPU_H__

@@ -53,7 +53,7 @@ class PYBIND11_EXPORT BoxScaleUpdater : public Updater
     std::shared_ptr<BoxDim> getBox();
 
     /// Set a new m_box
-    void setBox(std::shared_ptr<BoxDim> box1);
+    void setBox(std::shared_ptr<BoxDim> box);
 
     /// Gets particle scaling filter
     std::shared_ptr<ParticleGroup> getGroup()
@@ -87,9 +87,13 @@ class PYBIND11_EXPORT BoxScaleUpdater : public Updater
     virtual void scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box);
 
     protected:
-    std::shared_ptr<BoxDim> m_box1;         ///< C++ box assoc with min
-    std::shared_ptr<BoxDim> m_box2;         ///< C++ box assoc with max
-    std::shared_ptr<Variant> m_variant;     //!< Variant that interpolates between boxes
+    std::shared_ptr<BoxDim> m_box;         ///< C++ box assoc with min
+    std::shared_ptr<Variant> m_variant_x;     //!< Variant that scales box in x direction
+    std::shared_ptr<Variant> m_variant_y;     //!< Variant that scales box in y direction
+    std::shared_ptr<Variant> m_variant_z;     //!< Variant that scales box in z direction
+    std::shared_ptr<Variant> m_variant_xy;     //!< Variant that scales box xy tilt 
+    std::shared_ptr<Variant> m_variant_xz;     //!< Variant that scales box xz tilt 
+    std::shared_ptr<Variant> m_variant_yz;     //!< Variant that scales box yz tilt 
     std::shared_ptr<ParticleGroup> m_group; //!< Selected particles to scale when resizing the box.
     };
 

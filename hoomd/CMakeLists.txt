@@ -57,6 +57,7 @@ set(_hoomd_sources Action.cc
                    Analyzer.cc
                    BondedGroupData.cc
                    BoxResizeUpdater.cc
+                   BoxScaleUpdater.cc
                    CellList.cc
                    CellListStencil.cc
                    ClockSource.cc
@@ -125,6 +126,8 @@ set(_hoomd_headers
     BoxResizeUpdater.h
     BoxResizeUpdaterGPU.cuh
     BoxResizeUpdaterGPU.h
+    BoxScaleUpdater.h
+    BoxScaleUpdaterGPU.h
     UpdaterRemoveDrift.h
     CachedAllocator.h
     CellListGPU.cuh
@@ -197,6 +200,7 @@ set(_hoomd_headers
 
 if (ENABLE_HIP)
 list(APPEND _hoomd_sources BoxResizeUpdaterGPU.cc
+                           BoxScaleUpdaterGPU.cc
                            CellListGPU.cc
                            CommunicatorGPU.cc
                            LoadBalancerGPU.cc

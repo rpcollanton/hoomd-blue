@@ -1,11 +1,11 @@
 // Copyright (c) 2009-2023 The Regents of the University of Michigan.
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
-/*! \file BoxResizeUpdater.cc
-    \brief Defines the BoxResizeUpdater class
+/*! \file BoxScaleUpdaterGPU.cc
+    \brief Defines the BoxScaleUpdaterGPU class
 */
 
-#include "BoxResizeUpdaterGPU.h"
+#include "BoxScaleUpdaterGPU.h"
 #include "BoxResizeUpdaterGPU.cuh"
 
 namespace hoomd
@@ -18,18 +18,23 @@ namespace hoomd
     The default setting is to scale particle positions along with the box.
 */
 
-BoxResizeUpdaterGPU::BoxResizeUpdaterGPU(std::shared_ptr<SystemDefinition> sysdef,
+BoxScaleUpdaterGPU::BoxScaleUpdaterGPU(std::shared_ptr<SystemDefinition> sysdef,
                                          std::shared_ptr<Trigger> trigger,
-                                         std::shared_ptr<BoxDim> box1,
-                                         std::shared_ptr<BoxDim> box2,
-                                         std::shared_ptr<Variant> variant,
+                                         std::shared_ptr<BoxDim> box,
+                                         std::shared_ptr<Variant> variant_x,
+                                         std::shared_ptr<Variant> variant_y,
+                                         std::shared_ptr<Variant> variant_z,
+                                         std::shared_ptr<Variant> variant_xy,
+                                         std::shared_ptr<Variant> variant_xz,
+                                         std::shared_ptr<Variant> variant_yz,
                                          std::shared_ptr<ParticleGroup> group)
-    : BoxResizeUpdater(sysdef, trigger, box1, box2, variant, group)
+    : BoxScaleUpdater(sysdef, trigger, box, variant_x, variant_y, variant_z, 
+                        variant_xy, variant_xz, variant_yz, group)
     {
     // only one GPU is supported
     if (!m_exec_conf->isCUDAEnabled())
         {
-        throw std::runtime_error("Cannot initialize BoxResizeUpdaterGPU on a CPU device.");
+        throw std::runtime_error("Cannot initialize BoxScaleUpdaterGPU on a CPU device.");
         }
 
     m_tuner_scale.reset(new Autotuner<1>({AutotunerBase::makeBlockSizeRange(m_exec_conf)},
@@ -40,13 +45,13 @@ BoxResizeUpdaterGPU::BoxResizeUpdaterGPU(std::shared_ptr<SystemDefinition> sysde
                                         "box_resize_wrap"));
     }
 
-BoxResizeUpdaterGPU::~BoxResizeUpdaterGPU()
+BoxScaleUpdaterGPU::~BoxScaleUpdaterGPU()
     {
-    m_exec_conf->msg->notice(5) << "Destroying BoxResizeUpdater" << std::endl;
+    m_exec_conf->msg->notice(5) << "Destroying BoxScaleUpdater" << std::endl;
     }
 
 /// Scale particles to the new box and wrap any others back into the box
-void BoxResizeUpdaterGPU::scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box)
+void BoxScaleUpdaterGPU::scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box)
     {
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(),
                                access_location::device,
@@ -80,15 +85,19 @@ void BoxResizeUpdaterGPU::scaleAndWrapParticles(const BoxDim& cur_box, const Box
 
 namespace detail
     {
-void export_BoxResizeUpdaterGPU(pybind11::module& m)
+void export_BoxScaleUpdaterGPU(pybind11::module& m)
     {
-    pybind11::class_<BoxResizeUpdaterGPU, BoxResizeUpdater, std::shared_ptr<BoxResizeUpdaterGPU>>(
+    pybind11::class_<BoxScaleUpdaterGPU, BoxScaleUpdater, std::shared_ptr<BoxScaleUpdaterGPU>>(
         m,
-        "BoxResizeUpdaterGPU")
+        "BoxScaleUpdaterGPU")
         .def(pybind11::init<std::shared_ptr<SystemDefinition>,
                             std::shared_ptr<Trigger>,
                             std::shared_ptr<BoxDim>,
-                            std::shared_ptr<BoxDim>,
+                            std::shared_ptr<Variant>,
+                            std::shared_ptr<Variant>,
+                            std::shared_ptr<Variant>,
+                            std::shared_ptr<Variant>,
+                            std::shared_ptr<Variant>,
                             std::shared_ptr<Variant>,
                             std::shared_ptr<ParticleGroup>>());
     }

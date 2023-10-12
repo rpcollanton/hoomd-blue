@@ -2,7 +2,7 @@
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
 /*! \file BoxScaleUpdater.cc
-    \brief Defines the BoxResizeUpdater class
+    \brief Defines the BoxScaleUpdater class
 */
 
 #include "BoxScaleUpdater.h"
@@ -23,7 +23,7 @@ namespace hoomd
     The default setting is to scale particle positions along with the box.
 */
 
-BoxResizeUpdater::BoxResizeUpdater(std::shared_ptr<SystemDefinition> sysdef,
+BoxScaleUpdater::BoxScaleUpdater(std::shared_ptr<SystemDefinition> sysdef,
                                    std::shared_ptr<Trigger> trigger,
                                    std::shared_ptr<BoxDim> box,
                                    std::shared_ptr<Variant> variant_x,
@@ -32,7 +32,7 @@ BoxResizeUpdater::BoxResizeUpdater(std::shared_ptr<SystemDefinition> sysdef,
                                    std::shared_ptr<Variant> variant_xy,
                                    std::shared_ptr<Variant> variant_xz,
                                    std::shared_ptr<Variant> variant_yz,
-                                   std::shared_ptr<ParticleGroup> m_group)
+                                   std::shared_ptr<ParticleGroup> group)
     : Updater(sysdef, trigger), m_box(box), m_variant_x(variant_x), m_variant_y(variant_y), 
       m_variant_z(variant_z), m_variant_xy(variant_xy), m_variant_xz(variant_xz), 
       m_variant_yz(variant_yz), m_group(group)
@@ -44,28 +44,28 @@ BoxResizeUpdater::BoxResizeUpdater(std::shared_ptr<SystemDefinition> sysdef,
     assert(m_variant_xy);
     assert(m_variant_xz);
     assert(m_variant_yz);
-    m_exec_conf->msg->notice(5) << "Constructing BoxResizeUpdater" << endl;
+    m_exec_conf->msg->notice(5) << "Constructing BoxScaleUpdater" << endl;
     }
 
-BoxResizeUpdater::~BoxResizeUpdater()
+BoxScaleUpdater::~BoxScaleUpdater()
     {
-    m_exec_conf->msg->notice(5) << "Destroying BoxResizeUpdater" << endl;
+    m_exec_conf->msg->notice(5) << "Destroying BoxScaleUpdater" << endl;
     }
 
 /// Get box
-std::shared_ptr<BoxDim> BoxResizeUpdater::getBox()
+std::shared_ptr<BoxDim> BoxScaleUpdater::getBox()
     {
     return m_box;
     }
 
 /// Set a new box
-void BoxResizeUpdater::setBox(std::shared_ptr<BoxDim> box)
+void BoxScaleUpdater::setBox(std::shared_ptr<BoxDim> box)
     {
     m_box = box;
     }
 
 /// Get the current box based on the timestep
-BoxDim BoxResizeUpdater::getCurrentBox(uint64_t timestep)
+BoxDim BoxScaleUpdater::getCurrentBox(uint64_t timestep)
     {
     Scalar init_value_x = (*m_variant_x)(0)
     Scalar init_value_y = (*m_variant_y)(0)
@@ -108,7 +108,7 @@ BoxDim BoxResizeUpdater::getCurrentBox(uint64_t timestep)
 /** Perform the needed calculations to scale the box size
     \param timestep Current time step of the simulation
 */
-void BoxResizeUpdater::update(uint64_t timestep)
+void BoxScaleUpdater::update(uint64_t timestep)
     {
     Updater::update(timestep);
     m_exec_conf->msg->notice(10) << "Box resize update" << endl;
@@ -138,7 +138,7 @@ void BoxResizeUpdater::update(uint64_t timestep)
     }
 
 /// Scale particles to the new box and wrap any others back into the box
-void BoxResizeUpdater::scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box)
+void BoxScaleUpdater::scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim& new_box)
     {
     ArrayHandle<Scalar4> h_pos(m_pdata->getPositions(),
                                access_location::host,
@@ -177,11 +177,11 @@ void BoxResizeUpdater::scaleAndWrapParticles(const BoxDim& cur_box, const BoxDim
 
 namespace detail
     {
-void export_BoxResizeUpdater(pybind11::module& m)
+void export_BoxScaleUpdater(pybind11::module& m)
     {
-    pybind11::class_<BoxResizeUpdater, Updater, std::shared_ptr<BoxResizeUpdater>>(
+    pybind11::class_<BoxScaleUpdater, Updater, std::shared_ptr<BoxScaleUpdater>>(
         m,
-        "BoxResizeUpdater")
+        "BoxScaleUpdater")
         .def(pybind11::init<std::shared_ptr<SystemDefinition>,
                             std::shared_ptr<Trigger>,
                             std::shared_ptr<BoxDim>,
@@ -192,17 +192,17 @@ void export_BoxResizeUpdater(pybind11::module& m)
                             std::shared_ptr<Variant>,
                             std::shared_ptr<Variant>,
                             std::shared_ptr<ParticleGroup>>())
-        .def_property("box", &BoxResizeUpdater::getBox, &BoxResizeUpdater::setBox)
-        .def_property("variant_x", &BoxResizeUpdater::getVariantX, &BoxResizeUpdater::setVariantX)
-        .def_property("variant_y", &BoxResizeUpdater::getVariantY, &BoxResizeUpdater::setVariantY)
-        .def_property("variant_z", &BoxResizeUpdater::getVariantZ, &BoxResizeUpdater::setVariantZ)
-        .def_property("variant_xy", &BoxResizeUpdater::getVariantXY, &BoxResizeUpdater::setVariantXY)
-        .def_property("variant_xz", &BoxResizeUpdater::getVariantXZ, &BoxResizeUpdater::setVariantXZ)
-        .def_property("variant_yz", &BoxResizeUpdater::getVariantYZ, &BoxResizeUpdater::setVariantYZ)
+        .def_property("box", &BoxScaleUpdater::getBox, &BoxScaleUpdater::setBox)
+        .def_property("variant_x", &BoxScaleUpdater::getVariantX, &BoxScaleUpdater::setVariantX)
+        .def_property("variant_y", &BoxScaleUpdater::getVariantY, &BoxScaleUpdater::setVariantY)
+        .def_property("variant_z", &BoxScaleUpdater::getVariantZ, &BoxScaleUpdater::setVariantZ)
+        .def_property("variant_xy", &BoxScaleUpdater::getVariantXY, &BoxScaleUpdater::setVariantXY)
+        .def_property("variant_xz", &BoxScaleUpdater::getVariantXZ, &BoxScaleUpdater::setVariantXZ)
+        .def_property("variant_yz", &BoxScaleUpdater::getVariantYZ, &BoxScaleUpdater::setVariantYZ)
         .def_property_readonly("filter",
-                               [](const std::shared_ptr<BoxResizeUpdater> method)
+                               [](const std::shared_ptr<BoxScaleUpdater> method)
                                { return method->getGroup()->getFilter(); })
-        .def("get_current_box", &BoxResizeUpdater::getCurrentBox);
+        .def("get_current_box", &BoxScaleUpdater::getCurrentBox);
     }
 
     } // end namespace detail
