@@ -123,15 +123,15 @@ class BoxScale(Updater):
         if isinstance(self._simulation.device, hoomd.device.CPU):
             self._cpp_obj = _hoomd.BoxScaleUpdater(
                 self._simulation.state._cpp_sys_def, self.trigger,
-                self.box._cpp_obj, self.variant[0], self.variant[1],
-                self.variant[2], self.variant[3], self.variant[4],
-                self.variant[5], group)
+                self.box._cpp_obj, self.variants[0], self.variants[1],
+                self.variants[2], self.variants[3], self.variants[4],
+                self.variants[5], group)
         else:
             self._cpp_obj = _hoomd.BoxScaleUpdaterGPU(
                 self._simulation.state._cpp_sys_def, self.trigger,
-                self.box._cpp_obj, self.variant[0], self.variant[1],
-                self.variant[2], self.variant[3], self.variant[4],
-                self.variant[5], group)
+                self.box._cpp_obj, self.variants[0], self.variants[1],
+                self.variants[2], self.variants[3], self.variants[4],
+                self.variants[5], group)
 
     def get_box(self, timestep):
         """Get the box for a given timestep.

@@ -14,6 +14,7 @@ See Also:
 """
 
 from hoomd.update.box_resize import BoxResize
+from hoomd.update.box_scale import BoxScale
 from hoomd.update.remove_drift import RemoveDrift
 from hoomd.update.custom_updater import CustomUpdater
 from hoomd.update.particle_filter import FilterUpdater

@@ -67,18 +67,18 @@ void BoxScaleUpdater::setBox(std::shared_ptr<BoxDim> box)
 /// Get the current box based on the timestep
 BoxDim BoxScaleUpdater::getCurrentBox(uint64_t timestep)
     {
-    Scalar init_value_x = (*m_variant_x)(0)
-    Scalar init_value_y = (*m_variant_y)(0)
-    Scalar init_value_z = (*m_variant_z)(0)
-    Scalar init_value_xy = (*m_variant_xy)(0)
-    Scalar init_value_xz = (*m_variant_xz)(0)
-    Scalar init_value_yz = (*m_variant_yz)(0)
-    Scalar cur_value_x = (*m_variant_x)(timestep)
-    Scalar cur_value_y = (*m_variant_y)(timestep)
-    Scalar cur_value_z = (*m_variant_z)(timestep)
-    Scalar cur_value_xy = (*m_variant_xy)(timestep)
-    Scalar cur_value_xz = (*m_variant_xz)(timestep)
-    Scalar cur_value_yz = (*m_variant_yz)(timestep)
+    Scalar init_value_x = (*m_variant_x)(0);
+    Scalar init_value_y = (*m_variant_y)(0);
+    Scalar init_value_z = (*m_variant_z)(0);
+    Scalar init_value_xy = (*m_variant_xy)(0);
+    Scalar init_value_xz = (*m_variant_xz)(0);
+    Scalar init_value_yz = (*m_variant_yz)(0);
+    Scalar cur_value_x = (*m_variant_x)(timestep);
+    Scalar cur_value_y = (*m_variant_y)(timestep);
+    Scalar cur_value_z = (*m_variant_z)(timestep);
+    Scalar cur_value_xy = (*m_variant_xy)(timestep);
+    Scalar cur_value_xz = (*m_variant_xz)(timestep);
+    Scalar cur_value_yz = (*m_variant_yz)(timestep);
     
     Scalar3 scale_L = make_scalar3(1,1,1);
     Scalar scale_xy = 1;
@@ -95,7 +95,7 @@ BoxDim BoxScaleUpdater::getCurrentBox(uint64_t timestep)
         }
     
     const auto& box = *m_box;
-    Scalar3 new_L = box.getL() * scale_L
+    Scalar3 new_L = box.getL() * scale_L;
     Scalar xy = box.getTiltFactorXY() * scale_xy;
     Scalar xz = box.getTiltFactorXZ() * scale_xz;
     Scalar yz = box.getTiltFactorYZ() * scale_yz;
