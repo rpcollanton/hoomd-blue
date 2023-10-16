@@ -1751,6 +1751,21 @@ class OPP(Pair):
         self._add_typeparam(params)
 
 
+class Hsu(Pair):
+    
+    _cpp_class_name = "PotentialPairHsu"
+
+    def __init__(self, nlist, default_r_cut=None, default_r_on=0., mode='none'):
+        super().__init__(nlist, default_r_cut, default_r_on, mode)
+        params = TypeParameter(
+            'params', 'particle_types',
+            TypeParameterDict(a=float,
+                              r0=float,
+                              len_keys=2))
+        self._add_typeparam(params)
+
+
+
 class TWF(Pair):
     r"""Pair potential model for globular proteins.
 

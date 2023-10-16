@@ -157,6 +157,7 @@ from .pair import (
     LJ0804,
     Fourier,
     OPP,
+    Hsu,
     Table,
     TWF,
     LJGauss,
