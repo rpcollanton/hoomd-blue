@@ -10,6 +10,9 @@
 
 #include <assert.h>
 
+// SMALL a relatively small number
+#define SMALL Scalar(0.0001)
+
 /*! \file SineSqAngleForceGPU.cu
     \brief Defines GPU kernel code for calculating the sine squared angle forces. Used by
     SineSqAngleForceComputeGPU.
@@ -126,38 +129,46 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         Scalar rsqcb = dot(dcb, dcb);
         Scalar rcb = fast::sqrt(rsqcb);
 
-        Scalar x = dot(dab, dcb);
-        x /= rab * rcb; // cos(t)
 
+        // get sines and cosines
+        Scalar cos_abbc = dot(dab, dcb);
+        cos_abbc /= rab * rcb; // cos(t)
+        Scalar sin_abbc = sqrtf(Scalar(1.0) - cos_abbc * cos_abbc);
+        
         Scalar theta = fast::acos(x);
-        Scalar eval_sin, eval_cos;
-        fast::sincos(b*theta, eval_sin, eval_cos);
+        Scalar eval_sinb, eval_cosb;
+        fast::sincos(b*theta, eval_sinb, eval_cosb);
 
-        Scalar3 dxdrab = dcb/(rab*rcb) - dab/rsqab * x;
-        Scalar3 dxdrcb = dab/(rab*rcb) - dcb/rsqcb * x;
+        // check sine magnitudes
+        if (eval_sinb < SMALL)
+            eval_sinb = SMALL;
+        if (sin_abbc < SMALL)
+            sin_abbc = SMALL;
+        
+        Scalar r1r2inv = 1/(rab*rcb);
+        Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
+        Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
 
         // get other derivatives
-        Scalar t = a * eval_sin;
-        Scalar dudtheta = -2*b*t*eval_cos;
-        Scalar dthetadx = -1/fast::sin(theta);
-        Scalar dudx = dudtheta*dthetadx;
+        Scalar t = a * eval_sinb;
+        Scalar dudtheta = -2*b*t*eval_cosb;
+        Scalar dthetadcos = -1/sin_abbc;
+        Scalar dudcos = dudtheta*dthetadcos;
 
-        Scalar3 f1 = -dudx*dxdrab;
-        Scalar3 f2 = -dudx*dxdrcb;
-
+        // evaluate forces
         Scalar fab[3], fcb[3];
 
-        fab[0] = f1.x;
-        fab[1] = f1.y;
-        fab[2] = f1.z;
+        fab[0] = -dudcos * dcosdrab.x;
+        fab[1] = -dudcos * dcosdrab.y;
+        fab[2] = -dudcos * dcosdrab.z;
 
-        fcb[0] = f2.x;
-        fcb[1] = f2.y;
-        fcb[2] = f2.z;
+        fcb[0] = -dudcos * dcosdrcb.x;
+        fcb[1] = -dudcos * dcosdrcb.y;
+        fcb[2] = -dudcos * dcosdrcb.z;
 
         // the rest should be the same as for the harmonic bond
         // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = tk * dcosth * Scalar(Scalar(1.0) / Scalar(6.0));
+        Scalar angle_eng = Scalar(Scalar(-1.) / Scalar(3.)) * t * eval_sinb;
 
         // upper triangular version of virial tensor
         Scalar angle_virial[6];
