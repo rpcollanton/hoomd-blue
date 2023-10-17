@@ -148,6 +148,16 @@ class CosineSquared(Angle):
                                TypeParameterDict(t0=float, k=float, len_keys=1))
         self._add_typeparam(params)
 
+class SineSquared(Angle):
+
+    _cpp_class_name = 'SineSqAngleForceCompute'
+
+    def __init__(self):
+        super().__init__()
+        params = TypeParameter('params', 'angle_types',
+                               TypeParameterDict(a=float, b=float, len_keys=1))
+        self._add_typeparam(params)
+
 
 class Table(Angle):
     """Tabulated bond force.

@@ -31,6 +31,7 @@ md.pair
     Morse
     Moliere
     OPP
+    Hsu
     Pair
     ReactionField
     Table
@@ -62,6 +63,7 @@ md.pair
         Morse,
         Moliere,
         OPP,
+        Hsu,
         ReactionField,
         ExpandedLJ,
         Table,

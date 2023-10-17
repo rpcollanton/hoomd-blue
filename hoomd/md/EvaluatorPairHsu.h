@@ -10,7 +10,7 @@
 
 #include "hoomd/HOOMDMath.h"
 
-/*! \file EvaluatorPairHSU.h
+/*! \file EvaluatorPairHsu.h
     \brief Defines the pair evaluator class for HSU potential
 */
 
@@ -30,7 +30,7 @@ namespace hoomd
 namespace md
     {
 
-class EvaluatorPairHSU
+class EvaluatorPairHsu
     {
     public:
     //! Define the parameter type used by this pair potential evaluator
@@ -75,7 +75,7 @@ class EvaluatorPairHSU
         \param _rcutsq Squared distance at which the potential goes to 0
         \param _params Per type pair parameters of this potential
     */
-    DEVICE EvaluatorPairHSU(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
+    DEVICE EvaluatorPairHsu(Scalar _rsq, Scalar _rcutsq, const param_type& _params)
         : rsq(_rsq), rcutsq(_rcutsq), params(_params)
         {
         }
@@ -106,23 +106,25 @@ class EvaluatorPairHSU
         {
         if (rsq < rcutsq)
             {
-            if (rsq < fast::pow(r0,2))
+            Scalar r0sq = fast::pow(params.r0,2);
+            if (rsq < r0sq)
                 {
                 pair_eng = 0;
                 force_divr = 0;
+                return true;
                 }
             else
                 {
                 // Get quantities need for both energy and force calculation
                 Scalar r(fast::sqrt(rsq));
                 Scalar eval_sin, eval_cos;
-                fast::sincospi(fast::pow(r / params.r0, 2), eval_sin, eval_cos);
+                fast::sincospi(rsq/r0sq, eval_sin, eval_cos);
 
                 // Compute energy
                 pair_eng = params.a * eval_cos;
 
                 // Compute force
-                force_divr = -2*M_PI * r / fast::pow(params.r0, 2) * params.a * eval_sin;
+                force_divr = -2*M_PI * r / r0sq * params.a * eval_sin;
 
                 return true;
                 }
