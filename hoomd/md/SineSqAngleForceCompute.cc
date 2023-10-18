@@ -191,9 +191,7 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
         Scalar eval_sinb, eval_cosb;
         fast::sincos(m_b[angle_type]*theta, eval_sinb, eval_cosb);
         
-        // check sin magnitudes (in case theta close to 0 or pi)
-        if (eval_sinb < SMALL)
-            eval_sinb = SMALL;
+        // check sin magnitude (in case theta close to 0 or pi)
         if (sin_abbc < SMALL)
             sin_abbc = SMALL;
 

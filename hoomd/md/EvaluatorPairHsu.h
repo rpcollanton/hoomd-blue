@@ -111,12 +111,10 @@ class EvaluatorPairHsu
                 {
                 pair_eng = 0;
                 force_divr = 0;
-                return true;
                 }
             else
                 {
                 // Get quantities need for both energy and force calculation
-                Scalar r(fast::sqrt(rsq));
                 Scalar eval_sin, eval_cos;
                 fast::sincospi(rsq/r0sq, eval_sin, eval_cos);
 
@@ -124,10 +122,9 @@ class EvaluatorPairHsu
                 pair_eng = params.a * eval_cos;
 
                 // Compute force
-                force_divr = -2*M_PI * r / r0sq * params.a * eval_sin;
-
-                return true;
+                force_divr = 2*M_PI*params.a / r0sq * eval_sin;
                 }
+            return true;
             }
         else
             {
