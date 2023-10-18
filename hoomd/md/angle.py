@@ -148,6 +148,18 @@ class CosineSquared(Angle):
                                TypeParameterDict(t0=float, k=float, len_keys=1))
         self._add_typeparam(params)
 
+
+class Cosine(Angle):
+
+    _cpp_class_name = 'CosineAngleForceCompute'
+
+    def __init__(self):
+        super().__init__()
+        params = TypeParameter('params', 'angle_types',
+                               TypeParameterDict(k=float, t0=float, len_keys=1))
+        self._add_typeparam(params)
+
+
 class SineSquared(Angle):
 
     _cpp_class_name = 'SineSqAngleForceCompute'

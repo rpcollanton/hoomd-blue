@@ -1,11 +1,11 @@
 // Copyright (c) 2009-2023 The Regents of the University of Michigan.
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
-/*! \file SineSqAngleForceComputeGPU.cc
-    \brief Defines SineSqAngleForceComputeGPU
+/*! \file CosineAngleForceComputeGPU.cc
+    \brief Defines CosineAngleForceComputeGPU
 */
 
-#include "SineSqAngleForceComputeGPU.h"
+#include "CosineAngleForceComputeGPU.h"
 
 using namespace std;
 
@@ -15,8 +15,8 @@ namespace md
     {
 /*! \param sysdef System to compute angle forces on
  */
-SineSqAngleForceComputeGPU::SineSqAngleForceComputeGPU(std::shared_ptr<SystemDefinition> sysdef)
-    : SineSqAngleForceCompute(sysdef)
+CosineAngleForceComputeGPU::CosineAngleForceComputeGPU(std::shared_ptr<SystemDefinition> sysdef)
+    : CosineAngleForceCompute(sysdef)
     {
     // can't run on the GPU if there aren't any GPUs in the execution configuration
     if (!m_exec_conf->isCUDAEnabled())
@@ -32,11 +32,11 @@ SineSqAngleForceComputeGPU::SineSqAngleForceComputeGPU(std::shared_ptr<SystemDef
 
     m_tuner.reset(new Autotuner<1>({AutotunerBase::makeBlockSizeRange(m_exec_conf)},
                                    m_exec_conf,
-                                   "sinesq_angle"));
+                                   "cosine_angle"));
     m_autotuners.push_back(m_tuner);
     }
 
-SineSqAngleForceComputeGPU::~SineSqAngleForceComputeGPU() { }
+CosineAngleForceComputeGPU::~CosineAngleForceComputeGPU() { }
 
 /*! \param type Type of the angle to set parameters for
     \param a
@@ -45,13 +45,13 @@ SineSqAngleForceComputeGPU::~SineSqAngleForceComputeGPU() { }
     Sets parameters for the potential of a particular angle type and updates the
     parameters on the GPU.
 */
-void SineSqAngleForceComputeGPU::setParams(unsigned int type, Scalar a, Scalar tb_0)
+void CosineAngleForceComputeGPU::setParams(unsigned int type, Scalar k, Scalar t_0)
     {
-    SineSqAngleForceCompute::setParams(type, a, b);
+    CosineAngleForceCompute::setParams(type, k, t_0);
 
     ArrayHandle<Scalar2> h_params(m_params, access_location::host, access_mode::readwrite);
     // update the local copy of the memory
-    h_params.data[type] = make_scalar2(a, b);
+    h_params.data[type] = make_scalar2(k, t_0);
     }
 
 /*! Internal method for computing the forces on the GPU.
@@ -59,9 +59,9 @@ void SineSqAngleForceComputeGPU::setParams(unsigned int type, Scalar a, Scalar t
 
     \param timestep Current time step of the simulation
 
-    Calls gpu_compute_sinesq_angle_forces to do the dirty work.
+    Calls gpu_compute_cosine_angle_forces to do the dirty work.
 */
-void SineSqAngleForceComputeGPU::computeForces(uint64_t timestep)
+void CosineAngleForceComputeGPU::computeForces(uint64_t timestep)
     {
     // the angle table is up to date: we are good to go. Call the kernel
     ArrayHandle<Scalar4> d_pos(m_pdata->getPositions(), access_location::device, access_mode::read);
@@ -84,7 +84,7 @@ void SineSqAngleForceComputeGPU::computeForces(uint64_t timestep)
 
     // run the kernel on the GPU
     m_tuner->begin();
-    kernel::gpu_compute_sinesq_angle_forces(d_force.data,
+    kernel::gpu_compute_cosine_angle_forces(d_force.data,
                                               d_virial.data,
                                               m_virial.getPitch(),
                                               m_pdata->getN(),
@@ -105,12 +105,12 @@ void SineSqAngleForceComputeGPU::computeForces(uint64_t timestep)
 
 namespace detail
     {
-void export_SineSqAngleForceComputeGPU(pybind11::module& m)
+void export_CosineAngleForceComputeGPU(pybind11::module& m)
     {
-    pybind11::class_<SineSqAngleForceComputeGPU,
-                     SineSqAngleForceCompute,
-                     std::shared_ptr<SineSqAngleForceComputeGPU>>(m,
-                                                                    "SineSqAngleForceComputeGPU")
+    pybind11::class_<CosineAngleForceComputeGPU,
+                     CosineAngleForceCompute,
+                     std::shared_ptr<CosineAngleForceComputeGPU>>(m,
+                                                                    "CosineAngleForceComputeGPU")
         .def(pybind11::init<std::shared_ptr<SystemDefinition>>());
     }
 

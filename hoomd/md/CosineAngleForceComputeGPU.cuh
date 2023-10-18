@@ -5,13 +5,13 @@
 #include "hoomd/HOOMDMath.h"
 #include "hoomd/ParticleData.cuh"
 
-/*! \file SineSqAngleForceGPU.cuh
+/*! \file CosineAngleForceGPU.cuh
     \brief Declares GPU kernel code for calculating the sine squared angle forces. Used
-    by SineSqAngleForceComputeGPU.
+    by CosineAngleForceComputeGPU.
 */
 
-#ifndef __SINESQANGLEFORCEGPU_CUH__
-#define __SINESQANGLEFORCEGPU_CUH__
+#ifndef __COSINEANGLEFORCEGPU_CUH__
+#define __COSINEANGLEFORCEGPU_CUH__
 
 namespace hoomd
     {
@@ -19,8 +19,8 @@ namespace md
     {
 namespace kernel
     {
-//! Kernel driver that computes sine squared angle forces for SineSqAngleForceComputeGPU
-hipError_t gpu_compute_sinesq_angle_forces(Scalar4* d_force,
+//! Kernel driver that computes sine squared angle forces for CosineAngleForceComputeGPU
+hipError_t gpu_compute_cosine_angle_forces(Scalar4* d_force,
                                              Scalar* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,

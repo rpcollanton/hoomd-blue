@@ -45,7 +45,7 @@ SineSqAngleForceComputeGPU::~SineSqAngleForceComputeGPU() { }
     Sets parameters for the potential of a particular angle type and updates the
     parameters on the GPU.
 */
-void SineSqAngleForceComputeGPU::setParams(unsigned int type, Scalar a, Scalar tb_0)
+void SineSqAngleForceComputeGPU::setParams(unsigned int type, Scalar a, Scalar b)
     {
     SineSqAngleForceCompute::setParams(type, a, b);
 

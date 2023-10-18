@@ -1,7 +1,7 @@
 // Copyright (c) 2009-2023 The Regents of the University of Michigan.
 // Part of HOOMD-blue, released under the BSD 3-Clause License.
 
-#include "SineSqAngleForceCompute.h"
+#include "CosineAngleForceCompute.h"
 
 #include <iostream>
 #include <math.h>
@@ -11,10 +11,10 @@
 using namespace std;
 
 // SMALL a relatively small number
-#define SMALL Scalar(0.0001)
+#define SMALL Scalar(1E-5)
 
-/*! \file SineSqAngleForceCompute.cc
-    \brief Contains code for the SineSqAngleForceCompute class
+/*! \file CosineAngleForceCompute.cc
+    \brief Contains code for the CosineAngleForceCompute class
 */
 
 namespace hoomd
@@ -24,10 +24,10 @@ namespace md
 /*! \param sysdef System to compute forces on
     \post Memory is allocated, and forces are zeroed.
 */
-SineSqAngleForceCompute::SineSqAngleForceCompute(std::shared_ptr<SystemDefinition> sysdef)
-    : ForceCompute(sysdef), m_a(NULL), m_b(NULL)
+CosineAngleForceCompute::CosineAngleForceCompute(std::shared_ptr<SystemDefinition> sysdef)
+    : ForceCompute(sysdef), m_k(NULL), m_t_0(NULL)
     {
-    m_exec_conf->msg->notice(5) << "Constructing SineSqAngleForceCompute" << endl;
+    m_exec_conf->msg->notice(5) << "Constructing CosineAngleForceCompute" << endl;
 
     // access the angle data for later use
     m_angle_data = m_sysdef->getAngleData();
@@ -39,27 +39,27 @@ SineSqAngleForceCompute::SineSqAngleForceCompute(std::shared_ptr<SystemDefinitio
         }
 
     // allocate the parameters -- same as for harmonic
-    m_a = new Scalar[m_angle_data->getNTypes()];
-    m_b = new Scalar[m_angle_data->getNTypes()];
+    m_k = new Scalar[m_angle_data->getNTypes()];
+    m_t_0 = new Scalar[m_angle_data->getNTypes()];
     }
 
-SineSqAngleForceCompute::~SineSqAngleForceCompute()
+CosineAngleForceCompute::~CosineAngleForceCompute()
     {
-    m_exec_conf->msg->notice(5) << "Destroying SineSqAngleForceCompute" << endl;
+    m_exec_conf->msg->notice(5) << "Destroying CosineAngleForceCompute" << endl;
 
-    delete[] m_a;
-    delete[] m_b;
-    m_a = NULL;
-    m_b = NULL;
+    delete[] m_k;
+    delete[] m_t_0;
+    m_k = NULL;
+    m_t_0 = NULL;
     }
 
 /*! \param type Type of the angle to set parameters for
-    \param a 
-    \param b 
+    \param k
+    \param t_0 
 
     Sets parameters for the potential of a particular angle type
 */
-void SineSqAngleForceCompute::setParams(unsigned int type, Scalar a, Scalar b)
+void CosineAngleForceCompute::setParams(unsigned int type, Scalar k, Scalar t_0)
     {
     // make sure the type is valid
     if (type >= m_angle_data->getNTypes())
@@ -67,19 +67,19 @@ void SineSqAngleForceCompute::setParams(unsigned int type, Scalar a, Scalar b)
         throw runtime_error("Invalid angle type.");
         }
 
-    m_a[type] = a;
-    m_b[type] = b;
+    m_k[type] = k;
+    m_t_0[type] = t_0;
 
     }
 
-void SineSqAngleForceCompute::setParamsPython(std::string type, pybind11::dict params)
+void CosineAngleForceCompute::setParamsPython(std::string type, pybind11::dict params)
     {
     auto typ = m_angle_data->getTypeByName(type);
-    auto _params = sinesq_params(params);
-    setParams(typ, _params.a, _params.b);
+    auto _params = cosine_params(params);
+    setParams(typ, _params.k, _params.t_0);
     }
 
-pybind11::dict SineSqAngleForceCompute::getParams(std::string type)
+pybind11::dict CosineAngleForceCompute::getParams(std::string type)
     {
     auto typ = m_angle_data->getTypeByName(type);
     if (typ >= m_angle_data->getNTypes())
@@ -88,15 +88,15 @@ pybind11::dict SineSqAngleForceCompute::getParams(std::string type)
         }
 
     pybind11::dict params;
-    params["a"] = m_a[typ];
-    params["b"] = m_b[typ];
+    params["k"] = m_k[typ];
+    params["t_0"] = m_t_0[typ];
     return params;
     }
 
 /*! Actually perform the force computation
     \param timestep Current time step
  */
-void SineSqAngleForceCompute::computeForces(uint64_t timestep)
+void CosineAngleForceCompute::computeForces(uint64_t timestep)
     {
     assert(m_pdata);
     // access the particle data arrays
@@ -140,7 +140,7 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
         if (idx_a == NOT_LOCAL || idx_b == NOT_LOCAL || idx_c == NOT_LOCAL)
             {
             this->m_exec_conf->msg->error()
-                << "angle.sinesq: angle " << angle.tag[0] << " " << angle.tag[1] << " "
+                << "angle.cosine: angle " << angle.tag[0] << " " << angle.tag[1] << " "
                 << angle.tag[2] << " incomplete." << endl
                 << endl;
             throw std::runtime_error("Error in angle calculation");
@@ -171,7 +171,7 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
         dcb = box.minImage(dcb);
         dac = box.minImage(dac);
 
-        // this is where sinesq differs from harmonic
+        // this is where cosine differs from harmonic
         // FLOPS: 14 / MEM TRANSFER: 2 Scalars
 
         // FLOPS: 42 / MEM TRANSFER: 6 Scalars
@@ -185,28 +185,29 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
         Scalar sin_abbc = fast::sqrt(1.0 - cos_abbc * cos_abbc);
 
         // calculate the force
-        // get sine and cosine
         unsigned int angle_type = m_angle_data->getTypeByIndex(i);
-        Scalar theta = fast::acos(cos_abbc);
-        Scalar eval_sinb, eval_cosb;
-        fast::sincos(m_b[angle_type]*theta, eval_sinb, eval_cosb);
         
-        // check sin magnitudes (in case theta close to 0 or pi)
-        if (eval_sinb < SMALL)
-            eval_sinb = SMALL;
-        if (sin_abbc < SMALL)
-            sin_abbc = SMALL;
+        // get sine and cosine of preferred angle
+        Scalar sin_t0, cos_t0;
+        fast::sincos(m_t_0[angle_type], sin_t0, cos_t0);
 
         // get gradients wrt bond vectors
         Scalar r1r2inv = 1/(rab*rcb);
         Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
         Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
 
-        // get other derivatives
-        Scalar t = m_a[angle_type] * eval_sinb;
-        Scalar dudtheta = -2*m_b[angle_type]*t*eval_cosb;
-        Scalar dthetadcos = -1.0 / sin_abbc;
-        Scalar dudcos = dudtheta*dthetadcos;
+        // check sine of preferred angle. if preferred angle 0 or pi, avoid approximation:
+        Scalar dudcos;
+        if (sin_t0 < 1E-6)
+            {
+            dudcos = -m_k[angle_type] * cos_t0;
+            }
+        else
+            {
+            if (sin_abbc < SMALL)
+                sin_abbc = SMALL;
+            dudcos = -m_k[angle_type]*(cos_t0 - sin_t0 * cos_abbc/sin_abbc);
+            }
 
         Scalar fab[3], fcb[3];
 
@@ -220,7 +221,7 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
 
         // the rest of the computation should stay the same
         // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = Scalar(-1. / 3.) * t * eval_sinb;
+        Scalar angle_eng = Scalar(1. / 3.) * m_k[angle_type] * (1 - cos_abbc*cos_t0 - sin_abbc*sin_t0);
 
         // compute 1/3 of the virial, 1/3 for each atom in the angle
         // upper triangular version of virial tensor
@@ -268,14 +269,14 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
 
 namespace detail
     {
-void export_SineSqAngleForceCompute(pybind11::module& m)
+void export_CosineAngleForceCompute(pybind11::module& m)
     {
-    pybind11::class_<SineSqAngleForceCompute,
+    pybind11::class_<CosineAngleForceCompute,
                      ForceCompute,
-                     std::shared_ptr<SineSqAngleForceCompute>>(m, "SineSqAngleForceCompute")
+                     std::shared_ptr<CosineAngleForceCompute>>(m, "CosineAngleForceCompute")
         .def(pybind11::init<std::shared_ptr<SystemDefinition>>())
-        .def("getParams", &SineSqAngleForceCompute::getParams)
-        .def("setParams", &SineSqAngleForceCompute::setParamsPython);
+        .def("getParams", &CosineAngleForceCompute::getParams)
+        .def("setParams", &CosineAngleForceCompute::setParamsPython);
     }
 
     } // end namespace detail

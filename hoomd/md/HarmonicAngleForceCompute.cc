@@ -11,7 +11,7 @@
 using namespace std;
 
 // SMALL a relatively small number
-#define SMALL Scalar(0.001)
+#define SMALL Scalar(1E-5)
 
 /*! \file HarmonicAngleForceCompute.cc
     \brief Contains code for the HarmonicAngleForceCompute class

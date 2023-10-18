@@ -5,7 +5,7 @@
 // Copyright (c) 2009-2021 The Regents of the University of Michigan
 // This file is part of the HOOMD-blue project, released under the BSD 3-Clause License.
 
-#include "SineSqAngleForceGPU.cuh"
+#include "CosineAngleForceGPU.cuh"
 #include "hoomd/TextureTools.h"
 
 #include <assert.h>
@@ -13,9 +13,9 @@
 // SMALL a relatively small number
 #define SMALL Scalar(0.0001)
 
-/*! \file SineSqAngleForceGPU.cu
+/*! \file CosineAngleForceGPU.cu
     \brief Defines GPU kernel code for calculating the sine squared angle forces. Used by
-    SineSqAngleForceComputeGPU.
+    CosineAngleForceComputeGPU.
 */
 
 namespace hoomd
@@ -36,7 +36,7 @@ namespace kernel
     \param pitch Pitch of 2D angles list
     \param n_angles_list List of numbers of angles stored on the GPU
 */
-__global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
+__global__ void gpu_compute_cosine_angle_forces_kernel(Scalar4* d_force,
                                                          Scalar* d_virial,
                                                          const size_t virial_pitch,
                                                          const unsigned int N,
@@ -121,39 +121,40 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
 
         // get the angle parameters (MEM TRANSFER: 8 bytes)
         Scalar2 params = __ldg(d_params + cur_angle_type);
-        Scalar a = params.x;
-        Scalar b = params.y;
+        Scalar k = params.x;
+        Scalar t_0 = params.y;
 
         Scalar rsqab = dot(dab, dab);
         Scalar rab = fast::sqrt(rsqab);
         Scalar rsqcb = dot(dcb, dcb);
         Scalar rcb = fast::sqrt(rsqcb);
 
-
         // get sines and cosines
         Scalar cos_abbc = dot(dab, dcb);
         cos_abbc /= rab * rcb; // cos(t)
         Scalar sin_abbc = sqrtf(Scalar(1.0) - cos_abbc * cos_abbc);
         
-        Scalar theta = fast::acos(x);
-        Scalar eval_sinb, eval_cosb;
-        fast::sincos(b*theta, eval_sinb, eval_cosb);
+        // get sine and cosine of preferred angle
+        Scalar sin_t0, cos_t0;
+        fast::sincos(t_0, sin_t0, cos_t0);
 
-        // check sine magnitudes
-        if (eval_sinb < SMALL)
-            eval_sinb = SMALL;
-        if (sin_abbc < SMALL)
-            sin_abbc = SMALL;
-        
+        // get gradients wrt bond vectors
         Scalar r1r2inv = 1/(rab*rcb);
         Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
         Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
 
-        // get other derivatives
-        Scalar t = a * eval_sinb;
-        Scalar dudtheta = -2*b*t*eval_cosb;
-        Scalar dthetadcos = -1/sin_abbc;
-        Scalar dudcos = dudtheta*dthetadcos;
+        // check sine of preferred angle. if preferred angle 0 or pi, avoid instability:
+        Scalar dudcos;
+        if (sin_t0 < 1E-6)
+            {
+            dudcos = -k * cos_t0;
+            }
+        else
+            {
+            if (sin_abbc < SMALL)
+                sin_abbc = SMALL;
+            dudcos = -k*(cos_t0 - sin_t0 * cos_abbc/sin_abbc);
+            }
 
         // evaluate forces
         Scalar fab[3], fcb[3];
@@ -168,7 +169,7 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
 
         // the rest should be the same as for the harmonic bond
         // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = Scalar(Scalar(-1.) / Scalar(3.)) * t * eval_sinb;
+        Scalar angle_eng = Scalar(Scalar(1.) / Scalar(3.)) * k * (1 - cos_abbc*cos_t0 - sin_abbc*sin_t0);
 
         // upper triangular version of virial tensor
         Scalar angle_virial[6];
@@ -229,7 +230,7 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
     \a d_params should include one Scalar2 element per angle type. The x component contains a the
    spring constant and the y component contains b the equilibrium angle.
 */
-hipError_t gpu_compute_sinesq_angle_forces(Scalar4* d_force,
+hipError_t gpu_compute_cosine_angle_forces(Scalar4* d_force,
                                              Scalar* d_virial,
                                              const size_t virial_pitch,
                                              const unsigned int N,
@@ -247,7 +248,7 @@ hipError_t gpu_compute_sinesq_angle_forces(Scalar4* d_force,
 
     unsigned int max_block_size;
     hipFuncAttributes attr;
-    hipFuncGetAttributes(&attr, (const void*)gpu_compute_sinesq_angle_forces_kernel);
+    hipFuncGetAttributes(&attr, (const void*)gpu_compute_cosine_angle_forces_kernel);
     max_block_size = attr.maxThreadsPerBlock;
 
     unsigned int run_block_size = min(block_size, max_block_size);
@@ -257,7 +258,7 @@ hipError_t gpu_compute_sinesq_angle_forces(Scalar4* d_force,
     dim3 threads(run_block_size, 1, 1);
 
     // run the kernel
-    hipLaunchKernelGGL((gpu_compute_sinesq_angle_forces_kernel),
+    hipLaunchKernelGGL((gpu_compute_cosine_angle_forces_kernel),
                        dim3(grid),
                        dim3(threads),
                        0,

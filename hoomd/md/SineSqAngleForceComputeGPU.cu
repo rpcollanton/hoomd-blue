@@ -140,8 +140,6 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         fast::sincos(b*theta, eval_sinb, eval_cosb);
 
         // check sine magnitudes
-        if (eval_sinb < SMALL)
-            eval_sinb = SMALL;
         if (sin_abbc < SMALL)
             sin_abbc = SMALL;
         

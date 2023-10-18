@@ -33,7 +33,7 @@ struct cosine_params
     cosine_params() : k(0), t_0(0) { }
 
     cosine_params(pybind11::dict params)
-        : k(params["k"].cast<Scalar>()), t_0(params["t_0"].cast<Scalar>())
+        : k(params["k"].cast<Scalar>()), t_0(params["t0"].cast<Scalar>())
         {
         }
 
@@ -41,7 +41,7 @@ struct cosine_params
         {
         pybind11::dict v;
         v["k"] = k;
-        v["t_0"] = t_0;
+        v["t0"] = t_0;
         return v;
         }
 #endif

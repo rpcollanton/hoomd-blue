@@ -15,6 +15,7 @@ set(_md_sources module-md.cc
                    ComputeThermoHMA.cc
                    ConstantForceCompute.cc
                    CosineSqAngleForceCompute.cc
+                   CosineAngleForceCompute.cc
                    SineSqAngleForceCompute.cc
                    CustomForceCompute.cc
                    EvaluatorWalls.cc
@@ -81,6 +82,8 @@ set(_md_headers ActiveForceComputeGPU.h
                 ConstantForceCompute.h
                 CosineSqAngleForceComputeGPU.h
                 CosineSqAngleForceCompute.h
+                CosineAngleForceComputeGPU.h
+                CosineAngleForceCompute.h
                 SineSqAngleForceComputeGPU.h
                 SineSqAngleForceCompute.h
                 CustomForceCompute.h
@@ -235,6 +238,7 @@ list(APPEND _md_sources ActiveForceComputeGPU.cc
                            TwoStepConstantPressureGPU.cc
                            MuellerPlatheFlowGPU.cc
                            CosineSqAngleForceComputeGPU.cc
+                           CosineAngleForceComputeGPU.cc
                            SineSqAngleForceComputeGPU.cc
                            )
 endif()
@@ -273,6 +277,7 @@ set(_md_cu_sources ActiveForceComputeGPU.cu
                       TwoStepRATTLENVEGPU.cu
                       MuellerPlatheFlowGPU.cu
                       CosineSqAngleForceGPU.cu
+                      CosineAngleForceGPU.cu
                       SineSqAngleForceGPU.cu
                       )
 

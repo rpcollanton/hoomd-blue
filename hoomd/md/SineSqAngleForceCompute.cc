@@ -11,7 +11,7 @@
 using namespace std;
 
 // SMALL a relatively small number
-#define SMALL Scalar(0.0001)
+#define SMALL Scalar(1E-5)
 
 /*! \file SineSqAngleForceCompute.cc
     \brief Contains code for the SineSqAngleForceCompute class
