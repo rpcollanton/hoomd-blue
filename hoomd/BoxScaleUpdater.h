@@ -61,7 +61,7 @@ class PYBIND11_EXPORT BoxScaleUpdater : public Updater
         return m_group;
         }
 
-    /// Set the variant for interpolation
+    /// Set the variant for scaling
     void setVariantX(std::shared_ptr<Variant> variant)  { m_variant_x = variant; }
     void setVariantY(std::shared_ptr<Variant> variant)  { m_variant_y = variant; }
     void setVariantZ(std::shared_ptr<Variant> variant)  { m_variant_z = variant; }
@@ -69,7 +69,7 @@ class PYBIND11_EXPORT BoxScaleUpdater : public Updater
     void setVariantXZ(std::shared_ptr<Variant> variant) { m_variant_xz = variant; }
     void setVariantYZ(std::shared_ptr<Variant> variant) { m_variant_yz = variant; }
 
-    /// Get the variant for interpolation
+    /// Get the variant for scaling
     std::shared_ptr<Variant> getVariantX() { return m_variant_x; }
     std::shared_ptr<Variant> getVariantY() { return m_variant_y; }
     std::shared_ptr<Variant> getVariantZ() { return m_variant_z; }
@@ -80,7 +80,7 @@ class PYBIND11_EXPORT BoxScaleUpdater : public Updater
     /// Get the current box for the given timestep
     BoxDim getCurrentBox(uint64_t timestep);
 
-    /// Update box interpolation based on provided timestep
+    /// Update box based on provided timestep
     virtual void update(uint64_t timestep);
 
     /// Scale particles to the new box and wrap any back into the box

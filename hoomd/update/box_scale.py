@@ -7,6 +7,7 @@ import hoomd
 from hoomd.operation import Updater
 from hoomd.box import Box
 from hoomd.data.parameterdicts import ParameterDict
+from hoomd.data.typeconverter import TypeConverterSequence, OnlyTypes
 from hoomd.variant import Variant, Constant
 from hoomd import _hoomd
 from hoomd.filter import ParticleFilter, All
@@ -95,24 +96,26 @@ class BoxScale(Updater):
             update.
     """
 
-    def __init__(self, trigger, box, variants, filter=All()):
+    def __init__(self, trigger, box, variants, box_dof=['x','y','z'], filter=All()):
         params = ParameterDict(box=Box,
+                               variants=TypeConverterSequence(OnlyTypes(Variant, allow_none=True)),
+                               box_dof=TypeConverterSequence(OnlyTypes(str,allow_none=True)),
                                filter=ParticleFilter)
         
-        # make variant list
-        if isinstance(variants, Variant):
-            variants = [variants]
-        if len(variants)==1:
-            variants = [variants[0], variants[0], variants[0], 
-                        Constant(1), Constant(1), Constant(1)]
-        elif len(variants)==3:
-            for i in range(3):
-                variants.append(Constant(1))
-        elif len(variants!=6):
-            raise ValueError("Can not determine appropriate list of variants.")
+        # make an ordered variant list
+        if len(variants) != len(box_dof):
+            raise ValueError("Number of variants and number of box parameters to vary do not match.")
+        variants_organized = [None] * 6
+        alldims = ['x','y','z','xy','xz','yz']
+        for j, dim in enumerate(box_dof):
+            if dim not in alldims:
+                raise ValueError("Invalid box dimension passed.")
+            i = alldims.index(dim)
+            variants_organized[i] = variants[j]
         
         params['box'] = box
-        params['variants'] = variants
+        params['variants'] = variants_organized
+        params['box_dof'] = box_dof
         params['trigger'] = trigger
         params['filter'] = filter
         self._param_dict.update(params)
