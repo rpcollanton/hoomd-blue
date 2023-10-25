@@ -157,7 +157,6 @@ __global__ void gpu_compute_cosine_angle_forces_kernel(Scalar4* d_force,
             }
 
         // evaluate forces
-        Scalar fab[3], fcb[3];
 
         fab[0] = -dudcos * dcosdrab.x;
         fab[1] = -dudcos * dcosdrab.y;

@@ -135,7 +135,7 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         cos_abbc /= rab * rcb; // cos(t)
         Scalar sin_abbc = sqrtf(Scalar(1.0) - cos_abbc * cos_abbc);
         
-        Scalar theta = fast::acos(x);
+        Scalar theta = fast::acos(cos_abbc);
         Scalar eval_sinb, eval_cosb;
         fast::sincos(b*theta, eval_sinb, eval_cosb);
 
@@ -154,7 +154,6 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         Scalar dudcos = dudtheta*dthetadcos;
 
         // evaluate forces
-        Scalar fab[3], fcb[3];
 
         fab[0] = -dudcos * dcosdrab.x;
         fab[1] = -dudcos * dcosdrab.y;
