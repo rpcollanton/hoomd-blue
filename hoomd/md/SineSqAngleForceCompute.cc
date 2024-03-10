@@ -69,6 +69,7 @@ void SineSqAngleForceCompute::setParams(unsigned int type, Scalar a, Scalar b)
 
     m_a[type] = a;
     m_b[type] = b;
+    m_thetacutoff[type] = M_PI*(1-1/b);
 
     }
 
@@ -188,37 +189,55 @@ void SineSqAngleForceCompute::computeForces(uint64_t timestep)
         // get sine and cosine
         unsigned int angle_type = m_angle_data->getTypeByIndex(i);
         Scalar theta = fast::acos(cos_abbc);
-        Scalar eval_sinb, eval_cosb;
-        fast::sincos(m_b[angle_type]*(theta-M_PI), eval_sinb, eval_cosb);
-        
-        // check sin magnitude (in case theta close to 0 or pi)
-        if (sin_abbc < SMALL)
-            sin_abbc = SMALL;
 
-        // get gradients wrt bond vectors
-        Scalar r1r2inv = 1/(rab*rcb);
-        Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
-        Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
-
-        // get other derivatives
-        Scalar t = m_a[angle_type] * eval_sinb;
-        Scalar dudtheta = -2*m_b[angle_type]*t*eval_cosb;
-        Scalar dthetadcos = -1.0 / sin_abbc;
-        Scalar dudcos = dudtheta*dthetadcos;
 
         Scalar fab[3], fcb[3];
+        Scalar angle_eng;
 
-        fab[0] = -dudcos * dcosdrab.x;
-        fab[1] = -dudcos * dcosdrab.y;
-        fab[2] = -dudcos * dcosdrab.z;
+        if (theta>m_thetacutoff[angle_type])
+            {
+            Scalar eval_sinb, eval_cosb;
+            fast::sincos(m_b[angle_type]*(theta-M_PI), eval_sinb, eval_cosb);
+            
+            // check sin magnitude (in case theta close to 0 or pi)
+            if (sin_abbc < SMALL)
+                sin_abbc = SMALL;
 
-        fcb[0] = -dudcos * dcosdrcb.x;
-        fcb[1] = -dudcos * dcosdrcb.y;
-        fcb[2] = -dudcos * dcosdrcb.z;
+            // get gradients wrt bond vectors
+            Scalar r1r2inv = 1/(rab*rcb);
+            Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
+            Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
 
-        // the rest of the computation should stay the same
-        // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = Scalar(-1. / 3.) * t * eval_sinb;
+            // get other derivatives
+            Scalar t = m_a[angle_type] * eval_sinb;
+            Scalar dudtheta = -2*m_b[angle_type]*t*eval_cosb;
+            Scalar dthetadcos = -1.0 / sin_abbc;
+            Scalar dudcos = dudtheta*dthetadcos;            
+
+            fab[0] = -dudcos * dcosdrab.x;
+            fab[1] = -dudcos * dcosdrab.y;
+            fab[2] = -dudcos * dcosdrab.z;
+
+            fcb[0] = -dudcos * dcosdrcb.x;
+            fcb[1] = -dudcos * dcosdrcb.y;
+            fcb[2] = -dudcos * dcosdrcb.z;
+
+            // the rest of the computation should stay the same
+            // compute 1/3 of the energy, 1/3 for each atom in the angle
+            angle_eng = Scalar(-1. / 3.) * t * eval_sinb;
+            }
+        else
+            {
+            angle_eng = 0;
+
+            fab[0] = 0;
+            fab[1] = 0;
+            fab[2] = 0;
+
+            fcb[0] = 0;
+            fcb[1] = 0;
+            fcb[2] = 0;
+            }
 
         // compute 1/3 of the virial, 1/3 for each atom in the angle
         // upper triangular version of virial tensor

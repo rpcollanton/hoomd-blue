@@ -123,6 +123,7 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         Scalar2 params = __ldg(d_params + cur_angle_type);
         Scalar a = params.x;
         Scalar b = params.y;
+        Scalar thetacutoff = M_PI*(1-1/b);
 
         Scalar rsqab = dot(dab, dab);
         Scalar rab = fast::sqrt(rsqab);
@@ -136,36 +137,54 @@ __global__ void gpu_compute_sinesq_angle_forces_kernel(Scalar4* d_force,
         Scalar sin_abbc = sqrtf(Scalar(1.0) - cos_abbc * cos_abbc);
         
         Scalar theta = fast::acos(cos_abbc);
-        Scalar eval_sinb, eval_cosb;
-        fast::sincos(b*(theta-M_PI), eval_sinb, eval_cosb);
 
-        // check sine magnitudes
-        if (sin_abbc < SMALL)
-            sin_abbc = SMALL;
+        Scalar angle_eng;
+        if (theta>thetacutoff)
+            {
+            Scalar eval_sinb, eval_cosb;
+            fast::sincos(b*(theta-M_PI), eval_sinb, eval_cosb);
+
+            // check sine magnitudes
+            if (sin_abbc < SMALL)
+                sin_abbc = SMALL;
+            
+            Scalar r1r2inv = 1/(rab*rcb);
+            Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
+            Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
+
+            // get other derivatives
+            Scalar t = a * eval_sinb;
+            Scalar dudtheta = -2*b*t*eval_cosb;
+            Scalar dthetadcos = -1/sin_abbc;
+            Scalar dudcos = dudtheta*dthetadcos;
+
+            // evaluate forces
+
+            fab[0] = -dudcos * dcosdrab.x;
+            fab[1] = -dudcos * dcosdrab.y;
+            fab[2] = -dudcos * dcosdrab.z;
+
+            fcb[0] = -dudcos * dcosdrcb.x;
+            fcb[1] = -dudcos * dcosdrcb.y;
+            fcb[2] = -dudcos * dcosdrcb.z;
+
+            // the rest should be the same as for the harmonic bond
+            // compute 1/3 of the energy, 1/3 for each atom in the angle
+            angle_eng = Scalar(Scalar(-1.) / Scalar(3.)) * t * eval_sinb;
+            }
+        else
+            {
+            angle_eng = 0;
+
+            fab[0] = 0;
+            fab[1] = 0;
+            fab[2] = 0;
+
+            fcb[0] = 0;
+            fcb[1] = 0;
+            fcb[2] = 0;
+            }
         
-        Scalar r1r2inv = 1/(rab*rcb);
-        Scalar3 dcosdrab = dcb*r1r2inv - dab/rsqab * cos_abbc;
-        Scalar3 dcosdrcb = dab*r1r2inv - dcb/rsqcb * cos_abbc;
-
-        // get other derivatives
-        Scalar t = a * eval_sinb;
-        Scalar dudtheta = -2*b*t*eval_cosb;
-        Scalar dthetadcos = -1/sin_abbc;
-        Scalar dudcos = dudtheta*dthetadcos;
-
-        // evaluate forces
-
-        fab[0] = -dudcos * dcosdrab.x;
-        fab[1] = -dudcos * dcosdrab.y;
-        fab[2] = -dudcos * dcosdrab.z;
-
-        fcb[0] = -dudcos * dcosdrcb.x;
-        fcb[1] = -dudcos * dcosdrcb.y;
-        fcb[2] = -dudcos * dcosdrcb.z;
-
-        // the rest should be the same as for the harmonic bond
-        // compute 1/3 of the energy, 1/3 for each atom in the angle
-        Scalar angle_eng = Scalar(Scalar(-1.) / Scalar(3.)) * t * eval_sinb;
 
         // upper triangular version of virial tensor
         Scalar angle_virial[6];

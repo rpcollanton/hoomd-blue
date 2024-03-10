@@ -91,6 +91,7 @@ class PYBIND11_EXPORT SineSqAngleForceCompute : public ForceCompute
     protected:
     Scalar* m_a;   //!< a parameter
     Scalar* m_b;   //!< b parameter
+    Scalar* m_thetacutoff; //!< potential applies for cutoff < theta < pi
 
     std::shared_ptr<AngleData> m_angle_data; //!< Angle data to use in computing angles
 
