@@ -25,7 +25,7 @@ namespace md
     \post Memory is allocated, and forces are zeroed.
 */
 SineSqAngleForceCompute::SineSqAngleForceCompute(std::shared_ptr<SystemDefinition> sysdef)
-    : ForceCompute(sysdef), m_a(NULL), m_b(NULL)
+    : ForceCompute(sysdef), m_a(NULL), m_b(NULL), m_thetacutoff(NULL)
     {
     m_exec_conf->msg->notice(5) << "Constructing SineSqAngleForceCompute" << endl;
 
@@ -41,6 +41,7 @@ SineSqAngleForceCompute::SineSqAngleForceCompute(std::shared_ptr<SystemDefinitio
     // allocate the parameters -- same as for harmonic
     m_a = new Scalar[m_angle_data->getNTypes()];
     m_b = new Scalar[m_angle_data->getNTypes()];
+    m_thetacutoff = new Scalar[m_angle_data->getNTypes()];
     }
 
 SineSqAngleForceCompute::~SineSqAngleForceCompute()
@@ -49,8 +50,11 @@ SineSqAngleForceCompute::~SineSqAngleForceCompute()
 
     delete[] m_a;
     delete[] m_b;
+    delete[] m_thetacutoff;
+    
     m_a = NULL;
     m_b = NULL;
+    m_thetacutoff = NULL;
     }
 
 /*! \param type Type of the angle to set parameters for
